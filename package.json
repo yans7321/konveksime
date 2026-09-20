@@ -1,0 +1,14 @@
+{
+  "name": "konveksi-yans-erp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Konveksi YANS ERP Control Center (static app + Netlify Functions + PostgreSQL)",
+  "scripts": {
+    "db:migrate": "node netlify/functions/_migrate.mjs",
+    "test": "node --test tests/phase1.mjs tests/http.test.mjs",
+    "serve": "node tests/dev-server.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.11.5"
+  }
+}

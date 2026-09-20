@@ -1,0 +1,40 @@
+[build]
+  publish = "."
+  # Static site; Netlify Functions are bundled automatically from netlify/functions.
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Route clean /api/* URLs to serverless functions.
+# Explicit (not splat) so sub-paths like /api/auth/google map to their own function.
+[[redirects]]
+  from = "/api/auth/google/callback"
+  to = "/.netlify/functions/google-callback"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/google"
+  to = "/.netlify/functions/google-start"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth"
+  to = "/.netlify/functions/auth"
+  status = 200
+
+[[redirects]]
+  from = "/api/sync"
+  to = "/.netlify/functions/sync"
+  status = 200
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"
+    X-Content-Type-Options = "nosniff"
