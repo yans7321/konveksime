@@ -26,7 +26,7 @@ function makeDriver() {
       if (/^BEGIN$|^COMMIT$|^ROLLBACK$/.test(t)) return [];
       if (/pg_advisory_xact_lock/.test(t)) return [];
       if (/CREATE TABLE IF NOT EXISTS yans_migrations/.test(t)) return [];
-      if (/SELECT name FROM yans_migrations/.test(t)) return [{ name: "0001_foundation_tables" }];
+      if (/SELECT name FROM yans_migrations/.test(t)) return [{ name: "0001_foundation_tables" }, { name: "0002_jobs" }];
       if (/INSERT INTO yans_migrations/.test(t)) return [];
       if (/SELECT id FROM app_users WHERE lower\(username\)/.test(t)) {
         return [...users.values()].filter((u) => u.username.toLowerCase() === String(params[0]).toLowerCase()).map((u) => ({ id: u.id }));

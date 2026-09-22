@@ -19,6 +19,21 @@
   status = 200
 
 [[redirects]]
+  from = "/api/jobs"
+  to = "/.netlify/functions/jobs"
+  status = 200
+
+[[redirects]]
+  from = "/api/job-accessories"
+  to = "/.netlify/functions/job-items"
+  status = 200
+
+[[redirects]]
+  from = "/api/job-documents"
+  to = "/.netlify/functions/job-items"
+  status = 200
+
+[[redirects]]
   from = "/api/auth"
   to = "/.netlify/functions/auth"
   status = 200

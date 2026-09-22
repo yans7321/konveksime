@@ -104,6 +104,12 @@ export async function resolveSession(req) {
   return rows[0] || null;
 }
 
+// Thin wrapper used by every data endpoint: resolves the session user or null.
+// user_id ALWAYS comes from this — never from a client-supplied field.
+export function getUserId(req) {
+  return resolveSession(req).then((u) => (u ? u.id : null));
+}
+
 // Idempotent, ordered migrations. Safe to run repeatedly (and concurrently:
 // the advisory lock serializes workers so parallel lambdas cannot race).
 const MIGRATIONS = [
@@ -176,6 +182,64 @@ const MIGRATIONS = [
          updated_at timestamptz NOT NULL DEFAULT now(),
          CONSTRAINT yans_workbook_state_pk PRIMARY KEY (user_id, kind)
        )`,
+    ],
+  },
+  {
+    // Phase 2 — job management foundation. All tables are user-scoped so every
+    // query can filter by the authenticated user (no client-supplied owner).
+    name: "0002_jobs",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS yans_pekerjaan (
+         id            bigserial PRIMARY KEY,
+         user_id       bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         job_code      text NOT NULL,
+         perusahaan_id bigint REFERENCES yans_perusahaan(id) ON DELETE SET NULL,
+         legacy_id     bigint,
+         nama_pekerjaan text NOT NULL DEFAULT '',
+         tanggal_masuk date,
+         deadline      date,
+         jumlah_order  integer NOT NULL DEFAULT 0,
+         harga_per_pcs numeric(14,2) NOT NULL DEFAULT 0,
+         total_nilai   numeric(16,2) NOT NULL DEFAULT 0,
+         catatan       text,
+         status        text NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif','selesai','arsip')),
+         created_at    timestamptz NOT NULL DEFAULT now(),
+         updated_at    timestamptz NOT NULL DEFAULT now(),
+         deleted_at    timestamptz,
+         CONSTRAINT yans_pekerjaan_user_code_key UNIQUE (user_id, job_code),
+         CONSTRAINT yans_pekerjaan_user_legacy_key UNIQUE (user_id, legacy_id),
+         CONSTRAINT yans_pekerjaan_qty_nonneg CHECK (jumlah_order >= 0),
+         CONSTRAINT yans_pekerjaan_harga_nonneg CHECK (harga_per_pcs >= 0)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_pekerjaan_user_idx ON yans_pekerjaan (user_id, deleted_at)`,
+      `CREATE TABLE IF NOT EXISTS yans_job_accessories (
+         id            bigserial PRIMARY KEY,
+         user_id       bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         job_id        bigint NOT NULL REFERENCES yans_pekerjaan(id) ON DELETE CASCADE,
+         nama_asesoris text NOT NULL,
+         satuan        text,
+         jumlah        numeric(14,2) NOT NULL DEFAULT 0,
+         catatan       text,
+         created_at    timestamptz NOT NULL DEFAULT now(),
+         updated_at    timestamptz NOT NULL DEFAULT now(),
+         deleted_at    timestamptz,
+         CONSTRAINT yans_job_acc_user_job_key UNIQUE (user_id, job_id, nama_asesoris),
+         CONSTRAINT yans_job_acc_qty_nonneg CHECK (jumlah >= 0)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_job_acc_job_idx ON yans_job_accessories (job_id, deleted_at)`,
+      `CREATE TABLE IF NOT EXISTS yans_job_documents (
+         id          bigserial PRIMARY KEY,
+         user_id     bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         job_id      bigint NOT NULL REFERENCES yans_pekerjaan(id) ON DELETE CASCADE,
+         file_name   text NOT NULL,
+         mime_type   text,
+         size_bytes  bigint,
+         storage_ref text,
+         uploaded_at timestamptz NOT NULL DEFAULT now(),
+         deleted_at  timestamptz,
+         CONSTRAINT yans_job_doc_user_job_file_key UNIQUE (user_id, job_id, file_name)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_job_doc_job_idx ON yans_job_documents (job_id, deleted_at)`,
     ],
   },
 ];

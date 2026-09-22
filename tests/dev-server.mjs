@@ -17,6 +17,9 @@ const ROUTES = {
   "/api/auth": "./netlify/functions/auth.mjs",
   "/api/sync": "./netlify/functions/sync.mjs",
   "/api/health": "./netlify/functions/health.mjs",
+  "/api/jobs": "./netlify/functions/jobs.mjs",
+  "/api/job-accessories": "./netlify/functions/job-items.mjs",
+  "/api/job-documents": "./netlify/functions/job-items.mjs",
 };
 
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".json": "application/json" };

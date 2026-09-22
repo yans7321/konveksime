@@ -37,6 +37,7 @@
     </style>
     <link rel="stylesheet" href="styles.css">
     <script src="app-api.js" defer></script>
+    <script src="app-jobs.js" defer></script>
 </head>
 <body class="min-h-screen antialiased bg-[#F8FAFC] text-slate-900">
 
@@ -455,6 +456,14 @@
                                     <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Harga Borongan/Pcs (Rp) *</label>
                                     <input type="number" id="t1-harga" min="0" placeholder="0" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition">
                                 </div>
+                                <div class="sm:col-span-1">
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Deadline</label>
+                                    <input type="date" id="t1-deadline" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition">
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Catatan</label>
+                                    <input type="text" id="t1-catatan" placeholder="Catatan pekerjaan (opsional)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition">
+                                </div>
                             </div>
 
                             <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-100 shadow-2xs">
@@ -462,6 +471,23 @@
                                 <div id="container-variants-t1" class="space-y-3"></div>
                                 <button type="button" onclick="addVariantRow('t1')" class="mt-4 text-xs bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl hover:bg-slate-100 transition shadow-2xs flex items-center gap-2"><i class="fa-solid fa-plus"></i> Tambah Rincian</button>
                             </div>
+
+                            <!-- Phase 2: Asesoris dinamis per pekerjaan (additive) -->
+                            <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-100 shadow-2xs">
+                                <label class="block text-sm font-extrabold text-slate-800 mb-4">Asesoris / Perlengkapan (opsional)</label>
+                                <div id="container-acc-t1" class="space-y-3"></div>
+                                <button type="button" onclick="YansJobs.addAccRow()" class="mt-4 text-xs bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl hover:bg-slate-100 transition shadow-2xs flex items-center gap-2"><i class="fa-solid fa-plus"></i> Tambah Asesoris</button>
+                            </div>
+
+                            <!-- Phase 2: Foto nota / dokumen (metadata; upload menunggu storage provider) -->
+                            <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-100 shadow-2xs">
+                                <label class="block text-sm font-extrabold text-slate-800 mb-2">Foto Nota / Dokumen Pekerjaan</label>
+                                <input type="file" id="t1-nota-input" accept="image/*,.pdf" multiple class="hidden">
+                                <button type="button" onclick="YansJobs.pickNota()" class="text-xs bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl hover:bg-slate-100 transition shadow-2xs flex items-center gap-2"><i class="fa-solid fa-camera text-blue-600"></i> Pilih File Nota</button>
+                                <p id="t1-nota-status" class="mt-2 text-[11px] text-slate-500 font-medium"></p>
+                            </div>
+
+                            <p id="t1-server-status" class="text-[11px] text-slate-400 font-medium"></p>
 
                             <div class="flex justify-end pt-2">
                                 <button type="submit" id="btn-submit-t1" class="bg-blue-600 text-white font-bold px-8 py-3.5 rounded-xl text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/25">Simpan Pekerjaan</button>
