@@ -24,6 +24,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/tailoring-pickups"
+  to = "/.netlify/functions/pickups"
+  status = 200
+
+[[redirects]]
   from = "/api/job-accessories"
   to = "/.netlify/functions/job-items"
   status = 200

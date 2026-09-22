@@ -242,7 +242,54 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS yans_job_doc_job_idx ON yans_job_documents (job_id, deleted_at)`,
     ],
   },
+  {
+    // Phase 3 — tailoring pickups (Ambil Jahit). Transaction layer on top of
+    // Phase 2 jobs: each row records one controlled take of job quantity.
+    // Available quantity is NEVER stored — always derived as
+    //   jumlah_order - SUM(pickups.quantity)   (per user, live at read time)
+    // so it can never drift out of sync with the transaction log.
+    name: "0003_tailoring_pickups",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS yans_tailoring_pickups (
+         id           bigserial PRIMARY KEY,
+         user_id      bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         job_id       bigint NOT NULL REFERENCES yans_pekerjaan(id) ON DELETE CASCADE,
+         quantity     integer NOT NULL CHECK (quantity > 0),
+         picked_up_at date,
+         tukang       text,
+         jenis        text,
+         catatan      text,
+         legacy_id    bigint,
+         created_at   timestamptz NOT NULL DEFAULT now(),
+         updated_at   timestamptz NOT NULL DEFAULT now(),
+         deleted_at   timestamptz,
+         CONSTRAINT yans_pickup_user_legacy_key UNIQUE (user_id, legacy_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_pickup_user_job_idx ON yans_tailoring_pickups (user_id, job_id, deleted_at)`,
+    ],
+  },
 ];
+
+// Runs work inside a database transaction. Used for multi-statement invariants
+// (e.g. read-available-then-insert must not interleave with other writes).
+// The test driver supports only a plain BEGIN/COMMIT passthrough.
+export async function withTransaction(fn) {
+  if (testDriver) {
+    return fn({ query: (text, params) => testDriver.query(text, params) });
+  }
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const out = await fn({ query: (text, params) => client.query(text, params).then((r) => r.rows) });
+    await client.query("COMMIT");
+    return out;
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
 
 export async function runMigrations() {
   if (!isDbConfigured()) throw new Error("DB_NOT_CONFIGURED");
