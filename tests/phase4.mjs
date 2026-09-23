@@ -1,15 +1,16 @@
-// Phase 3 self-test (run: node --test tests/phase3.mjs)
-// Exercises the tailoring pickups (Ambil Jahit) API end-to-end against an
-// in-memory SQL emulator (no real PostgreSQL, no credentials). Covers:
-//   - happy path: 100 total -> take 30 -> available 70
-//   - multiple pickups: 30 + 20 -> taken 50 / available 50
-//   - exact quantity: take all remaining -> available 0, job leaves the available list
-//   - over quantity: rejected (409), database unchanged
+// Phase 4 self-test (run: node --test tests/phase4.mjs)
+// Exercises the storages (Storan) API end-to-end against an in-memory SQL
+// emulator (no real PostgreSQL, no credentials). Covers:
+//   - storable snapshot: picked-up jobs with live total/taken/stored/notStored
+//   - flow per spec: 100 total -> take 40 -> store 15 -> store 25 -> store 1 more rejected
+//   - store before any pickup: rejected 404 (Ambil Jahit first)
+//   - over-store: rejected (409, insufficient_storable_quantity), DB unchanged
 //   - zero / negative / decimal / non-numeric quantities rejected
 //   - ownership isolation: foreign job_id rejected even when known; history isolated
 //   - unauthenticated access rejected
 //   - history records every transaction (date, job, perusahaan, quantity)
 //   - edit (legacy id) updates in place and re-validates with the old qty refunded
+//   - concurrent double submission: one succeeds, the other rejected (atomicity)
 //   - HTTP routing through the Netlify-like dev server
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -21,9 +22,10 @@ const authMod = await import("../netlify/functions/auth.mjs");
 const syncMod = await import("../netlify/functions/sync.mjs");
 const jobsMod = await import("../netlify/functions/jobs.mjs");
 const pickupsMod = await import("../netlify/functions/pickups.mjs");
+const storagesMod = await import("../netlify/functions/storages.mjs");
 const { startServer } = await import("./dev-server.mjs");
 
-// ---------- In-memory SQL emulator (Phase 1 + 2 + 3 statements) ----------
+// ---------- In-memory SQL emulator (Phase 1 + 2 + 3 + 4 statements) ----------
 function makeDriver() {
   const users = new Map();
   const sessions = new Map();
@@ -31,7 +33,8 @@ function makeDriver() {
   const perusahaan = new Map();
   const jobs = new Map();
   const pickups = new Map();
-  let nextId = { users: 1, pekerja: 1, perusahaan: 1, jobs: 1, pickups: 1 };
+  const storages = new Map();
+  let nextId = { users: 1, pekerja: 1, perusahaan: 1, jobs: 1, pickups: 1, storages: 1 };
   const now = () => new Date();
 
   const jobOut = (r) => ({ ...r, variants: typeof r.variants === "string" ? JSON.parse(r.variants) : r.variants });
@@ -56,7 +59,7 @@ function makeDriver() {
     return true;
   }
 
-  function pickupWithJoins(r) {
+  function storageWithJoins(r) {
     const j = jobs.get(r.job_id);
     const p = j && j.perusahaan_id ? perusahaan.get(j.perusahaan_id) : null;
     return {
@@ -67,12 +70,39 @@ function makeDriver() {
     };
   }
 
+  function sumsFor(userId, jobId) {
+    const taken = [...pickups.values()]
+      .filter((k) => k.user_id === userId && k.job_id === jobId && !k.deleted_at)
+      .reduce((s, k) => s + k.quantity, 0);
+    const stored = [...storages.values()]
+      .filter((s) => s.user_id === userId && s.job_id === jobId && !s.deleted_at)
+      .reduce((acc, s) => acc + s.quantity, 0);
+    return { taken, stored };
+  }
+
+  function storableRow(j, userId) {
+    const { taken, stored } = sumsFor(userId, j.id);
+    const pr = j.perusahaan_id ? perusahaan.get(j.perusahaan_id) : null;
+    return {
+      id: j.id, job_code: j.job_code, nama_pekerjaan: j.nama_pekerjaan, perusahaan_id: j.perusahaan_id,
+      legacy_id: j.legacy_id, status: j.status, jumlah_order: j.jumlah_order, taken, stored,
+      perusahaan_nama: pr ? pr.nama : null,
+    };
+  }
+
   return {
     async query(text, params = []) {
       const t = text.replace(/\s+/g, " ").trim();
 
       if (/^BEGIN$|^COMMIT$|^ROLLBACK$/.test(t)) return [];
-      if (/pg_advisory_xact_lock/.test(t)) return [];
+      if (/pg_advisory_xact_lock\(hashtext\(\$1\)\)/.test(t)) {
+        // Emulate the per-job advisory lock: a later acquirer continues only
+        // after earlier acquirers finished their whole microtask chain (i.e.
+        // their transaction completed). Keeps the concurrent double-submission
+        // test deterministic without real PostgreSQL.
+        return new Promise((resolve) => setImmediate(resolve));
+      }
+      if (/pg_advisory_xact_lock/.test(t)) return []; // unparameterized (migrations) — no-op
       if (/CREATE TABLE IF NOT EXISTS yans_migrations/.test(t)) return [];
       if (/SELECT name FROM yans_migrations/.test(t)) {
         return [{ name: "0001_foundation_tables" }, { name: "0002_jobs" }, { name: "0003_tailoring_pickups" }, { name: "0004_storages" }];
@@ -185,24 +215,20 @@ function makeDriver() {
       if (/INSERT INTO yans_job_documents/.test(t)) return [{ id: 1 }];
 
       // ---------- tailoring pickups (Phase 3) ----------
-      if (/SELECT p\.id, p\.job_code, p\.nama_pekerjaan, p\.perusahaan_id, p\.legacy_id, p\.status, p\.jumlah_order,/.test(t) && /WHERE p\.id = \$2/.test(t)) {
-        // jobAvailability: single-job snapshot with live taken sum
-        const j = jobs.get(params[1]);
-        if (!j || j.user_id !== params[0] || j.deleted_at) return [];
-        const taken = [...pickups.values()]
-          .filter((k) => k.user_id === params[0] && k.job_id === j.id && !k.deleted_at)
-          .reduce((s, k) => s + k.quantity, 0);
-        const pr = j.perusahaan_id ? perusahaan.get(j.perusahaan_id) : null;
-        return [{
-          id: j.id, job_code: j.job_code, nama_pekerjaan: j.nama_pekerjaan, perusahaan_id: j.perusahaan_id,
-          legacy_id: j.legacy_id, status: j.status, jumlah_order: j.jumlah_order, taken,
-          perusahaan_nama: pr ? pr.nama : null,
-        }];
+      // (checked AFTER the storages branches: both single-job snapshots share
+      // the same prefix; only the storages one selects "AS stored")
+      if (/COALESCE\(st\.stored, 0\)/.test(t)) {
+        // storages storable list (picked-up jobs of user with live sums)
+        return [...jobs.values()]
+          .filter((j) => j.user_id === params[0] && !j.deleted_at)
+          .filter((j) => sumsFor(params[0], j.id).taken > 0)
+          .sort((a, b) => b.id - a.id)
+          .map((j) => storableRow(j, params[0]));
       }
       if (/COALESCE\(pk\.taken, 0\)/.test(t)) {
-        // available list (all jobs of user with live sums)
+        // pickups available list (all jobs of user with live sums)
         return [...jobs.values()].filter((j) => j.user_id === params[0] && !j.deleted_at).sort((a, b) => b.id - a.id).map((j) => {
-          const taken = [...pickups.values()].filter((k) => k.user_id === params[0] && k.job_id === j.id && !k.deleted_at).reduce((s, k) => s + k.quantity, 0);
+          const { taken } = sumsFor(params[0], j.id);
           const pr = j.perusahaan_id ? perusahaan.get(j.perusahaan_id) : null;
           return { id: j.id, job_code: j.job_code, nama_pekerjaan: j.nama_pekerjaan, perusahaan_id: j.perusahaan_id, legacy_id: j.legacy_id, status: j.status, jumlah_order: j.jumlah_order, taken, perusahaan_nama: pr ? pr.nama : null };
         });
@@ -233,19 +259,74 @@ function makeDriver() {
         return jobFiltered.sort((a, b) => b.id - a.id).slice(0, 500).map(pickupWithJoins);
       }
 
+      // ---------- storages (Phase 4) ----------
+      if (/p\.jumlah_order/.test(t) && /WHERE p\.id = \$2/.test(t) && /AS stored/.test(t)) {
+        // storages.jobStorable: single-job snapshot with live taken+stored sums
+        const j = jobs.get(params[1]);
+        if (!j || j.user_id !== params[0] || j.deleted_at) return [];
+        const { taken, stored } = sumsFor(params[0], j.id);
+        const pr = j.perusahaan_id ? perusahaan.get(j.perusahaan_id) : null;
+        return [{
+          id: j.id, job_code: j.job_code, nama_pekerjaan: j.nama_pekerjaan, perusahaan_id: j.perusahaan_id,
+          legacy_id: j.legacy_id, status: j.status, jumlah_order: j.jumlah_order, taken, stored,
+          perusahaan_nama: pr ? pr.nama : null,
+        }];
+      }
+      if (/p\.jumlah_order/.test(t) && /WHERE p\.id = \$2/.test(t)) {
+        // pickups.jobAvailability: single-job snapshot with live taken sum
+        const j = jobs.get(params[1]);
+        if (!j || j.user_id !== params[0] || j.deleted_at) return [];
+        const { taken } = sumsFor(params[0], j.id);
+        const pr = j.perusahaan_id ? perusahaan.get(j.perusahaan_id) : null;
+        return [{
+          id: j.id, job_code: j.job_code, nama_pekerjaan: j.nama_pekerjaan, perusahaan_id: j.perusahaan_id,
+          legacy_id: j.legacy_id, status: j.status, jumlah_order: j.jumlah_order, taken,
+          perusahaan_nama: pr ? pr.nama : null,
+        }];
+      }
+      if (/SELECT id, job_id, quantity FROM yans_storages WHERE user_id = \$1 AND legacy_id = \$2/.test(t)) {
+        const r = [...storages.values()].find((s) => s.user_id === params[0] && s.legacy_id === params[1] && !s.deleted_at);
+        return r ? [{ id: r.id, job_id: r.job_id, quantity: r.quantity }] : [];
+      }
+      if (/INSERT INTO yans_storages/.test(t)) {
+        const row = {
+          id: nextId.storages++, user_id: params[0], job_id: params[1], quantity: params[2], stored_at: params[3],
+          legacy_id: params[4], created_at: now(), updated_at: now(), deleted_at: null,
+        };
+        storages.set(row.id, row);
+        return [storageWithJoins(row)];
+      }
+      if (/^UPDATE yans_storages\s+SET quantity = \$1, stored_at = \$2, updated_at = now\(\)\s+WHERE id = \$3 AND user_id = \$4/.test(t)) {
+        const r = storages.get(params[2]);
+        if (!r || r.user_id !== params[3]) return [];
+        r.quantity = params[0]; r.stored_at = params[1]; r.updated_at = now();
+        return [storageWithJoins(r)];
+      }
+      if (/FROM yans_storages s\s+JOIN yans_pekerjaan p ON p\.id = s\.job_id/.test(t)) {
+        const out = [...storages.values()].filter((s) => s.user_id === params[0] && !s.deleted_at);
+        const jobFiltered = params[1] !== undefined ? out.filter((s) => s.job_id === params[1]) : out;
+        return jobFiltered.sort((a, b) => b.id - a.id).slice(0, 500).map(storageWithJoins);
+      }
+
       throw new Error("SQL emulator: unsupported statement: " + t.slice(0, 140));
     },
   };
 }
 
-function req(method, body, token, url = "https://yans.test/api/tailoring-pickups") {
+// The pickup row returned by INSERT/UPDATE includes job joins (same shape the
+// real pg driver produces after the JOIN-less RETURNING + availability lookup).
+function pickupWithJoins(r) {
+  return r;
+}
+
+function req(method, body, token, url = "https://yans.test/api/storages") {
   const headers = new Headers({ "content-type": "application/json" });
   if (token) headers.set("authorization", "Bearer " + token);
   return { method, headers, url, json: async () => body };
 }
 
 async function register(auth, name, username) {
-  const res = await auth(req("POST", { action: "register", name, username, password: "rahasia123" }, null, "https://yans.test/api/auth"), {});
+  const res = await auth(req("POST", { action: "register", name, username, password: "rahasia123" }, null, "https://yans.test/api/auth"));
   assert.equal(res.status, 200);
   return (await res.json()).token;
 }
@@ -258,7 +339,7 @@ async function createJob(jobs, token, perusahaanId, kode, jumlahOrder) {
   return (await res.json()).job;
 }
 
-test("Phase 3 pickups: klop validation, isolation, history, edit", async () => {
+test("Phase 4 storages: klop validation, pickup-first, isolation, history, edit", async () => {
   _useTestDriver(makeDriver());
   await runMigrations();
   await runMigrations(); // idempotent
@@ -267,6 +348,7 @@ test("Phase 3 pickups: klop validation, isolation, history, edit", async () => {
   const sync = syncMod.default;
   const jobs = jobsMod.default;
   const pickups = pickupsMod.default;
+  const storages = storagesMod.default;
 
   const tokenA = await register(auth, "Pemilik A", "pemilik_a");
   const tokenB = await register(auth, "Pemilik B", "pemilik_b");
@@ -281,142 +363,208 @@ test("Phase 3 pickups: klop validation, isolation, history, edit", async () => {
 
   const jobA = await createJob(jobs, tokenA, perusahaanIdA, "JOB-100", 100);
   const jobB = await createJob(jobs, tokenB, perusahaanIdB, "JOB-B", 75);
+  const jobC = await createJob(jobs, tokenA, perusahaanIdA, "JOB-C", 50); // never picked up
 
   // --- unauthenticated ditolak ---
-  res = await pickups(req("GET", null, null));
+  res = await storages(req("GET", null, null));
   assert.equal(res.status, 401);
-  res = await pickups(req("POST", { jobId: jobA.id, quantity: 10 }, null));
+  res = await storages(req("POST", { jobId: jobA.id, quantity: 10 }, null));
   assert.equal(res.status, 401);
 
-  // --- Happy path: 100 -> ambil 30 -> tersedia 70 ---
-  res = await pickups(req("POST", { jobId: jobA.id, quantity: 30, pickedUpAt: "2026-09-22", tukang: "Pak Budi", jenis: "Jahit" }, tokenA));
+  // --- Storan tanpa Ambil Jahit ditolak (jobC belum pernah diambil) ---
+  res = await storages(req("POST", { jobId: jobC.id, quantity: 10 }, tokenA));
+  assert.equal(res.status, 404);
+  assert.equal((await res.json()).error, "not_found");
+
+  // --- Flow spec: 100 total -> ambil 40 -> belum stor 40 ---
+  res = await pickups(req("POST", { jobId: jobA.id, quantity: 40, pickedUpAt: "2026-09-22", tukang: "Pak Budi", jenis: "Jahit" }, tokenA));
   assert.equal(res.status, 201);
+
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages?storable=1"));
+  assert.equal(res.status, 200);
   let body = await res.json();
-  assert.equal(body.pickup.quantity, 30);
-  assert.equal(body.pickup.jobCode, "JOB-100");
-  assert.equal(body.pickup.perusahaanNama, "PT ABC");
-  assert.equal(body.job.totalQuantity, 100);
-  assert.equal(body.job.takenQuantity, 30);
-  assert.equal(body.job.availableQuantity, 70);
-  const pickup1 = body.pickup.id;
+  let entry = body.items.find((j) => j.jobId === jobA.id);
+  assert.ok(entry, "job yang sudah diambil harus muncul di daftar storable");
+  assert.equal(entry.totalQuantity, 100);
+  assert.equal(entry.takenQuantity, 40);
+  assert.equal(entry.storedQuantity, 0);
+  assert.equal(entry.notStoredQuantity, 40);
 
-  // --- Multiple pickups: +20 -> taken 50 / available 50 ---
-  res = await pickups(req("POST", { jobId: jobA.id, quantity: "20" }, tokenA));
+  // Job milik user lain dan job yang belum diambil tidak boleh muncul
+  assert.equal(body.items.find((j) => j.jobId === jobB.id), undefined);
+  assert.equal(body.items.find((j) => j.jobId === jobC.id), undefined);
+
+  // --- Stor 15: total 100 / diambil 40 / stor 15 / belum 25 ---
+  res = await storages(req("POST", { jobId: jobA.id, quantity: 15, storedAt: "2026-09-22" }, tokenA));
   assert.equal(res.status, 201);
   body = await res.json();
-  assert.equal(body.job.takenQuantity, 50);
-  assert.equal(body.job.availableQuantity, 50);
+  assert.equal(body.storage.quantity, 15);
+  assert.equal(body.storage.jobCode, "JOB-100");
+  assert.equal(body.storage.perusahaanNama, "PT ABC");
+  assert.equal(body.job.takenQuantity, 40);
+  assert.equal(body.job.storedQuantity, 15);
+  assert.equal(body.job.notStoredQuantity, 25);
+  const storage1 = body.storage.id;
 
-  // --- Available list: jobA MASIH muncul dengan available 50 ---
-  res = await pickups(req("GET", null, tokenA, "https://yans.test/api/tailoring-pickups?available=1"));
+  // --- Storable list: masih tampil dengan belum 25 ---
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages?storable=1"));
   body = await res.json();
-  const inList = body.items.find((j) => j.jobId === jobA.id);
-  assert.ok(inList, "job dengan sisa harus tampil di daftar tersedia");
-  assert.equal(inList.availableQuantity, 50);
-  assert.equal(inList.perusahaanNama, "PT ABC");
+  entry = body.items.find((j) => j.jobId === jobA.id);
+  assert.ok(entry, "job dengan sisa belum stor harus tampil");
+  assert.equal(entry.notStoredQuantity, 25);
 
-  // --- Over quantity: ambil 51 dari 50 -> 409, DB tidak berubah ---
-  res = await pickups(req("POST", { jobId: jobA.id, quantity: 51 }, tokenA));
+  // --- Over-store: 26 dari 25 -> 409, DB tidak berubah ---
+  res = await storages(req("POST", { jobId: jobA.id, quantity: 26 }, tokenA));
   assert.equal(res.status, 409);
-  assert.equal((await res.json()).error, "insufficient_quantity");
-  res = await pickups(req("GET", null, tokenA, "https://yans.test/api/tailoring-pickups?jobId=" + jobA.id + "&available=1"));
-  body = await res.json();
-  assert.equal(body.job.takenQuantity, 50); // tetap 50, tidak berubah
+  assert.equal((await res.json()).error, "insufficient_storable_quantity");
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages?storable=1&jobId=" + jobA.id));
+  assert.equal((await res.json()).job.storedQuantity, 15); // tetap
 
-  // --- Exact quantity: ambil 50 -> berhasil, available 0 ---
-  res = await pickups(req("POST", { jobId: jobA.id, quantity: 50 }, tokenA));
+  // --- Stor 25 (pas): belum stor jadi 0, keluar dari daftar storable ---
+  res = await storages(req("POST", { jobId: jobA.id, quantity: 25 }, tokenA));
   assert.equal(res.status, 201);
   body = await res.json();
-  assert.equal(body.job.availableQuantity, 0);
-  assert.equal(body.job.takenQuantity, 100);
+  assert.equal(body.job.storedQuantity, 40);
+  assert.equal(body.job.notStoredQuantity, 0);
 
-  // --- Available list: job dengan available 0 tidak lagi muncul ---
-  res = await pickups(req("GET", null, tokenA, "https://yans.test/api/tailoring-pickups?available=1"));
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages?storable=1"));
   body = await res.json();
-  assert.equal(body.items.find((j) => j.jobId === jobA.id), undefined);
+  assert.equal(body.items.find((j) => j.jobId === jobA.id), undefined, "job lunas tidak lagi storable");
+
+  // --- Stor 1 lagi -> 409 (semua sudah distor) ---
+  res = await storages(req("POST", { jobId: jobA.id, quantity: 1 }, tokenA));
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error, "insufficient_storable_quantity");
 
   // --- Validasi quantity ---
   for (const bad of [0, -1, 10.5, "abc", "", null, undefined, "1.5", Number.MAX_SAFE_INTEGER + 1]) {
-    res = await pickups(req("POST", { jobId: jobA.id, quantity: bad }, tokenA));
+    res = await storages(req("POST", { jobId: jobA.id, quantity: bad }, tokenA));
     assert.equal(res.status, 400, "quantity " + JSON.stringify(bad) + " harus ditolak");
     const err = (await res.json()).error;
     assert.ok(err === "invalid_quantity" || err === "invalid_input", "kode error konsisten: " + err);
   }
 
   // --- jobId tidak valid / tidak ada ---
-  res = await pickups(req("POST", { jobId: 999999, quantity: 5 }, tokenA));
+  res = await storages(req("POST", { jobId: 999999, quantity: 5 }, tokenA));
   assert.equal(res.status, 404);
-  res = await pickups(req("POST", { quantity: 5 }, tokenA));
+  res = await storages(req("POST", { quantity: 5 }, tokenA));
   assert.equal(res.status, 400);
 
-  // --- Ownership isolation ---
-  // A memakai job milik B -> 404 walau ID diketahui
-  res = await pickups(req("POST", { jobId: jobB.id, quantity: 5 }, tokenA));
+  // --- Ownership isolation: job milik B ditolak walau ID diketahui ---
+  res = await storages(req("POST", { jobId: jobB.id, quantity: 5 }, tokenA));
   assert.equal(res.status, 404);
-  // A tidak bisa membaca availability job milik B
-  res = await pickups(req("GET", null, tokenA, "https://yans.test/api/tailoring-pickups?jobId=" + jobB.id + "&available=1"));
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages?storable=1&jobId=" + jobB.id));
   assert.equal(res.status, 404);
-  // History A tidak memuat transaksi B dan sebaliknya
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages?storable=1&jobId=" + jobC.id));
+  assert.equal(res.status, 404, "job tanpa pickup tidak boleh terlihat storable");
+
+  // B melakukan pickup lalu stor; riwayat A dan B terisolasi
   res = await pickups(req("POST", { jobId: jobB.id, quantity: 25 }, tokenB));
   assert.equal(res.status, 201);
-  res = await pickups(req("GET", null, tokenA, "https://yans.test/api/tailoring-pickups"));
+  res = await storages(req("POST", { jobId: jobB.id, quantity: 10 }, tokenB));
+  assert.equal(res.status, 201);
+
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages"));
   const histA = (await res.json()).items;
-  assert.equal(histA.length, 3); // 30 + 20 + 50 milik A saja
-  assert.ok(histA.every((k) => k.jobId === jobA.id));
-  res = await pickups(req("GET", null, tokenB, "https://yans.test/api/tailoring-pickups"));
+  assert.equal(histA.length, 2); // 15 + 25 milik A saja
+  assert.ok(histA.every((s) => s.jobId === jobA.id));
+  res = await storages(req("GET", null, tokenB, "https://yans.test/api/storages"));
   const histB = (await res.json()).items;
   assert.equal(histB.length, 1);
   assert.equal(histB[0].jobId, jobB.id);
   assert.equal(histB[0].perusahaanNama, "PT XYZ");
 
+  // --- Riwayat tercatat lengkap (tanggal, pekerjaan, perusahaan, jumlah) ---
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages"));
+  body = await res.json();
+  const s1 = body.items.find((x) => x.id === storage1);
+  assert.ok(s1, "transaksi stor pertama ada di riwayat");
+  assert.equal(s1.quantity, 15);
+  assert.equal(s1.jobCode, "JOB-100");
+  assert.equal(s1.perusahaanNama, "PT ABC");
+  assert.equal(String(s1.storedAt).slice(0, 10), "2026-09-22");
+
   // --- Edit (legacy id): update in place, old qty kembali ke pool sebelum validasi ---
-  res = await pickups(req("POST", { jobId: jobB.id, quantity: 10, legacyId: 777 }, tokenB));
-  assert.equal(res.status, 201, "edit-first-insert gagal: " + JSON.stringify(await res.clone().json()).slice(0, 200));
-  // B: total 75, taken 25+10=35, available 40. Edit pickup 10 -> 50 butuh ceiling 40+10=50 -> pas.
-  res = await pickups(req("POST", { jobId: jobB.id, quantity: 50, legacyId: 777 }, tokenB));
+  res = await storages(req("POST", { jobId: jobB.id, quantity: 5, legacyId: 888 }, tokenB));
+  assert.equal(res.status, 201);
+  // B: taken 25, stored 10+5=15, notStored 10. Edit legacy 5 -> 10: ceiling 10+5=15, pas.
+  res = await storages(req("POST", { jobId: jobB.id, quantity: 10, legacyId: 888 }, tokenB));
   assert.equal(res.status, 200); // updated
   body = await res.json();
-  assert.equal(body.pickup.quantity, 50);
-  assert.equal(body.pickup.id, histB[0].id + 1); // row yang sama, bukan insert baru
-  assert.equal(body.job.takenQuantity, 75);
-  assert.equal(body.job.availableQuantity, 0);
-  // Edit melebihi ceiling (available 0, ceiling 50) -> 409
-  res = await pickups(req("POST", { jobId: jobB.id, quantity: 51, legacyId: 777 }, tokenB));
+  assert.equal(body.storage.quantity, 10);
+  assert.equal(body.job.takenQuantity, 25);
+  assert.equal(body.job.storedQuantity, 20);
+  assert.equal(body.job.notStoredQuantity, 5);
+  // Reduksi ke 6 valid (old qty kembali ke pool)...
+  res = await storages(req("POST", { jobId: jobB.id, quantity: 6, legacyId: 888 }, tokenB));
+  assert.equal(res.status, 200);
+  body = await res.json();
+  assert.equal(body.storage.quantity, 6);
+  assert.equal(body.job.storedQuantity, 16);
+  assert.equal(body.job.notStoredQuantity, 9);
+  // ...edit melebihi ceiling (notStored 9 + old 6 = 15) -> 409
+  res = await storages(req("POST", { jobId: jobB.id, quantity: 16, legacyId: 888 }, tokenB));
   assert.equal(res.status, 409);
-  // legacyId milik user yang menunjuk job lain -> 409 (guard integritas)
+  assert.equal((await res.json()).error, "insufficient_storable_quantity");
+  // legacyId milik B menunjuk job lain -> 409 (guard integritas)
   res = await jobs(req("POST", { kodePekerjaan: "JOB-B2", perusahaanId: perusahaanIdB, jumlahOrder: 10, harga: 1000 }, tokenB, "https://yans.test/api/jobs"));
   assert.equal(res.status, 201);
   const jobB2 = (await res.json()).job;
-  res = await pickups(req("POST", { jobId: jobB2.id, quantity: 5, legacyId: 777 }, tokenB));
+  res = await pickups(req("POST", { jobId: jobB2.id, quantity: 5 }, tokenB));
+  assert.equal(res.status, 201);
+  res = await storages(req("POST", { jobId: jobB2.id, quantity: 3, legacyId: 888 }, tokenB));
   assert.equal(res.status, 409);
   assert.equal((await res.json()).error, "duplicate_legacy");
-  // legacyId space per-user: A bebas memakai legacyId 777 untuk job miliknya
-  res = await jobs(req("POST", { kodePekerjaan: "JOB-A2", perusahaanId: perusahaanIdA, jumlahOrder: 10, harga: 1000 }, tokenA, "https://yans.test/api/jobs"));
-  assert.equal(res.status, 201);
-  const jobA2 = (await res.json()).job;
-  res = await pickups(req("POST", { jobId: jobA2.id, quantity: 1, legacyId: 777 }, tokenA));
-  assert.equal(res.status, 201);
-
-  // --- Riwayat tercatat lengkap (tanggal, pekerjaan, perusahaan, jumlah) ---
-  res = await pickups(req("GET", null, tokenA, "https://yans.test/api/tailoring-pickups"));
-  body = await res.json();
-  const k = body.items.find((x) => x.id === pickup1);
-  assert.ok(k, "transaksi pertama ada di riwayat");
-  assert.equal(k.quantity, 30);
-  assert.equal(k.jobCode, "JOB-100");
-  assert.equal(k.perusahaanNama, "PT ABC");
-  assert.equal(String(k.pickedUpAt).slice(0, 10), "2026-09-22");
+  // legacyId space per-user: A bebas memakai legacyId 888 untuk job miliknya.
+  // jobA sudah lunas (notStored 0) -> insert baru ditolak 409, bukan duplikat.
+  res = await storages(req("POST", { jobId: jobA.id, quantity: 1, legacyId: 888 }, tokenA));
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error, "insufficient_storable_quantity");
 });
 
-test("HTTP routing: /api/tailoring-pickups terdaftar dan auth berjalan", async () => {
+test("Phase 4 storages: concurrent double submission tidak over-store", async () => {
+  _useTestDriver(makeDriver());
+  await runMigrations();
+
+  const auth = authMod.default;
+  const sync = syncMod.default;
+  const jobs = jobsMod.default;
+  const pickups = pickupsMod.default;
+  const storages = storagesMod.default;
+
+  const tokenA = await register(auth, "Owner C", "owner_c");
+  let res = await sync(req("POST", { kind: "perusahaan", items: [{ nama: "PT Concurrent" }] }, tokenA, "https://yans.test/api/sync"));
+  const pid = (await res.json()).items[0].id;
+  const job = await createJob(jobs, tokenA, pid, "JOB-CONC", 10);
+  res = await pickups(req("POST", { jobId: job.id, quantity: 10 }, tokenA));
+  assert.equal(res.status, 201);
+
+  // Dua request "bersamaan": belum_distor=10, A=10, B=10. Persis satu boleh lolos.
+  const results = await Promise.all([
+    storages(req("POST", { jobId: job.id, quantity: 10 }, tokenA)),
+    storages(req("POST", { jobId: job.id, quantity: 10 }, tokenA)),
+  ]);
+  const statuses = results.map((r) => r.status).sort();
+  assert.deepEqual(statuses, [201, 409], "persis satu request sukses, satunya ditolak: " + JSON.stringify(statuses));
+  const ok = results.find((r) => r.status === 201);
+  const okBody = await ok.json();
+  assert.equal(okBody.job.storedQuantity, 10);
+  assert.equal(okBody.job.notStoredQuantity, 0);
+
+  // Tidak ada duplikat: riwayat hanya 1 transaksi
+  res = await storages(req("GET", null, tokenA, "https://yans.test/api/storages"));
+  assert.equal((await res.json()).items.length, 1);
+});
+
+test("HTTP routing: /api/storages terdaftar dan auth berjalan", async () => {
   const server = await startServer(0);
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    let res = await fetch(base + "/api/tailoring-pickups");
+    let res = await fetch(base + "/api/storages");
     assert.equal(res.status, 401); // routing OK, auth menolak
-    res = await fetch(base + "/api/tailoring-pickups?available=1");
+    res = await fetch(base + "/api/storages?storable=1");
     assert.equal(res.status, 401);
-    res = await fetch(base + "/api/tailoring-pickups", {
+    res = await fetch(base + "/api/storages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobId: 1, quantity: 1 }),

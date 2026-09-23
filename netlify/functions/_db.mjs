@@ -243,6 +243,28 @@ const MIGRATIONS = [
     ],
   },
   {
+    // Phase 4 — storages (Storan). Records finished sewn goods returned from a
+    // pickup. Storable ceiling is NEVER stored — always derived as
+    //   SUM(pickups.quantity) - SUM(storages.quantity)   (per user, live)
+    // so a store can never exceed what was actually taken (Ambil Jahit first).
+    name: "0004_storages",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS yans_storages (
+         id         bigserial PRIMARY KEY,
+         user_id    bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         job_id     bigint NOT NULL REFERENCES yans_pekerjaan(id) ON DELETE CASCADE,
+         quantity   integer NOT NULL CHECK (quantity > 0),
+         stored_at  date,
+         legacy_id  bigint,
+         created_at timestamptz NOT NULL DEFAULT now(),
+         updated_at timestamptz NOT NULL DEFAULT now(),
+         deleted_at timestamptz,
+         CONSTRAINT yans_storage_user_legacy_key UNIQUE (user_id, legacy_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_storage_user_job_idx ON yans_storages (user_id, job_id, deleted_at)`,
+    ],
+  },
+  {
     // Phase 3 — tailoring pickups (Ambil Jahit). Transaction layer on top of
     // Phase 2 jobs: each row records one controlled take of job quantity.
     // Available quantity is NEVER stored — always derived as

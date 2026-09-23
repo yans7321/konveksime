@@ -39,6 +39,7 @@
     <script src="app-api.js" defer></script>
     <script src="app-jobs.js" defer></script>
     <script src="app-pickups.js" defer></script>
+    <script src="app-storages.js" defer></script>
 </head>
 <body class="min-h-screen antialiased bg-[#F8FAFC] text-slate-900">
 
@@ -676,6 +677,31 @@
                 </section>
 
                 <section id="view-tab3" class="space-y-6 hidden">
+                    <!-- Phase 4: sisa belum distor (live dari server) -->
+                    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
+                        <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-50/50">
+                            <div>
+                                <h3 class="font-extrabold text-slate-900 text-lg">Pekerjaan Belum Distor</h3>
+                                <p id="t3-storable-status" class="text-[11px] text-slate-400 font-medium mt-0.5">Angka dihitung otomatis: jumlah diambil − jumlah sudah stor.</p>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto p-4">
+                            <table class="w-full text-left text-sm whitespace-nowrap">
+                                <thead>
+                                    <tr class="text-slate-400 border-b border-slate-100 text-xs uppercase tracking-wider bg-slate-100/40">
+                                        <th class="p-3 font-bold">Pekerjaan</th>
+                                        <th class="p-3 font-bold">Perusahaan</th>
+                                        <th class="p-3 font-bold text-center">Total</th>
+                                        <th class="p-3 font-bold text-center">Diambil</th>
+                                        <th class="p-3 font-bold text-center">Sudah Stor</th>
+                                        <th class="p-3 font-bold text-center">Belum Stor</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-t3-storable" class="divide-y divide-slate-50 text-slate-700 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 lg:p-8 relative">
                         <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                             <div><h3 id="form-title-t3" class="text-xl font-extrabold text-slate-900 tracking-tight">Catat Storan Selesai</h3></div>
@@ -704,6 +730,7 @@
                             <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-100 shadow-2xs">
                                 <label class="block text-sm font-extrabold text-slate-800 mb-4">Rincian Barang Disetor Selesai</label>
                                 <div id="container-variants-t3" class="space-y-3"><div class="text-xs text-slate-500 italic">Silakan load data pengambilan...</div></div>
+                                <p id="t3-max-hint" class="mt-3 text-[11px] font-semibold text-slate-500"></p>
                             </div>
                             <div class="flex justify-end pt-2">
                                 <button type="submit" id="btn-submit-t3" class="bg-emerald-600 text-white font-bold px-8 py-3.5 rounded-xl text-sm hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20">Simpan Storan</button>
@@ -729,6 +756,27 @@
                                     </tr>
                                 </thead>
                                 <tbody id="table-tab3" class="divide-y divide-slate-50 text-slate-700 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                
+                    <!-- Phase 4: riwayat transaksi storan (server, append-only) -->
+                    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
+                        <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-50/50">
+                            <div><h3 class="font-extrabold text-slate-900 text-lg">Riwayat Transaksi Storan</h3></div>
+                        </div>
+                        <div class="overflow-x-auto p-4">
+                            <table class="w-full text-left text-sm whitespace-nowrap">
+                                <thead>
+                                    <tr class="text-slate-400 border-b border-slate-100 text-xs uppercase tracking-wider bg-slate-100/40">
+                                        <th class="p-3 font-bold">Tanggal</th>
+                                        <th class="p-3 font-bold">Pekerjaan</th>
+                                        <th class="p-3 font-bold">Perusahaan</th>
+                                        <th class="p-3 font-bold text-center">Jumlah Stor</th>
+                                        <th class="p-3 font-bold text-center hidden sm:table-cell">ID Transaksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-t3-history" class="divide-y divide-slate-50 text-slate-700 font-medium"></tbody>
                             </table>
                         </div>
                     </div>

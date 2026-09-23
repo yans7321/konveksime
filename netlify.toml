@@ -29,6 +29,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/storages"
+  to = "/.netlify/functions/storages"
+  status = 200
+
+[[redirects]]
   from = "/api/job-accessories"
   to = "/.netlify/functions/job-items"
   status = 200

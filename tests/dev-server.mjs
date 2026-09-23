@@ -19,6 +19,7 @@ const ROUTES = {
   "/api/health": "./netlify/functions/health.mjs",
   "/api/jobs": "./netlify/functions/jobs.mjs",
   "/api/tailoring-pickups": "./netlify/functions/pickups.mjs",
+  "/api/storages": "./netlify/functions/storages.mjs",
   "/api/job-accessories": "./netlify/functions/job-items.mjs",
   "/api/job-documents": "./netlify/functions/job-items.mjs",
 };
