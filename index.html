@@ -2063,6 +2063,67 @@
                             <div style="padding:15px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;"><small>${lbl.toUpperCase()}</small><br><b style="font-size:16px;color:#0f172a;">${net}</b></div>
                         </div>
                     </div>`;
+            } else if(tabKey === 'tab2') {
+                currentPdfTitle = `Laporan_Ambil_Jahit_${new Date().toISOString().slice(0,10)}`;
+                let rowsT2 = db.tab2.map(i => {
+                    let vStr = i.variants.map(v => `${v.warna}(${v.ukuran||v.size||'-'}) : <b>${v.jumlah}</b>`).join(', ');
+                    let q = i.variants.reduce((s,v)=>s+(Number(v.jumlah)||0),0);
+                    let tdUpah = i.harga ? `<td style="padding:8px;border-bottom:1px solid #ddd;text-align:right;">${formatRp(q*(Number(i.harga)||0))}</td>` : '';
+                    return `<tr><td style="padding:8px;border-bottom:1px solid #ddd;">${i.tanggal}</td><td style="padding:8px;border-bottom:1px solid #ddd;"><b>${i.tukang||'-'}</b></td><td style="padding:8px;border-bottom:1px solid #ddd;">${i.jenis||'-'}</td><td style="padding:8px;border-bottom:1px solid #ddd;">${i.model||'-'}${i.kode?`<br><small>${i.kode}</small>`:''}</td><td style="padding:8px;border-bottom:1px solid #ddd;">${vStr}</td><td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">${q}</td>${tdUpah}</tr>`;
+                }).join('');
+                let hasUpah = db.tab2.some(i => i.harga);
+                let thUpah = hasUpah ? `<th style="padding:8px;text-align:right;">Potensi Upah</th>` : '';
+                container.innerHTML = `
+                    <div style="font-family:sans-serif;padding:20px;color:#111;">
+                        <h2 style="margin:0;font-size:22px;font-weight:bold;">${compName}</h2>
+                        <p style="margin:2px 0 15px 0;font-size:12px;color:#555;">LAPORAN PENGAMBILAN / AMBIL JAHIT — ${dateNow}</p>
+                        <hr style="border:none;border-top:2px solid #333;margin-bottom:15px;">
+                        <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left;">
+                            <thead><tr style="background:#f1f5f9;"><th style="padding:8px;">Tanggal</th><th style="padding:8px;">Pekerja</th><th style="padding:8px;">Jenis</th><th style="padding:8px;">Model / Kode</th><th style="padding:8px;">Rincian</th><th style="padding:8px;text-align:center;">Qty</th>${thUpah}</tr></thead>
+                            <tbody>${rowsT2}</tbody>
+                        </table>
+                    </div>`;
+            } else if(tabKey === 'tab3') {
+                currentPdfTitle = `Laporan_Storan_${new Date().toISOString().slice(0,10)}`;
+                let rowsT3 = db.tab3.map(i => {
+                    let job = i.jobId ? db.tab1.find(x => x.id == i.jobId) : null;
+                    let pNama = job ? (job.perusahaanNama || (db.perusahaan.find(x=>x.id==job.perusahaanId)||{}).nama || '-') : null;
+                    let vStr = i.variants.map(v => `${v.warna}(${v.ukuran||v.size||'-'}) : <b>${v.jumlah}</b>`).join(', ');
+                    let q = i.variants.reduce((s,v)=>s+(Number(v.jumlah)||0),0);
+                    let tdP = pNama ? `<td style="padding:8px;border-bottom:1px solid #ddd;">${pNama}${job&&job.kodePekerjaan?`<br><small>${job.kodePekerjaan}</small>`:''}</td>` : '';
+                    return `<tr><td style="padding:8px;border-bottom:1px solid #ddd;">${i.tanggal}</td>${tdP}<td style="padding:8px;border-bottom:1px solid #ddd;">${i.jenis||'-'}</td><td style="padding:8px;border-bottom:1px solid #ddd;">${i.model||'-'}${i.tukang?`<br><small>${i.tukang}</small>`:''}</td><td style="padding:8px;border-bottom:1px solid #ddd;">${vStr}</td><td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">${q}</td></tr>`;
+                }).join('');
+                let anyJobT3 = db.tab3.some(i => i.jobId);
+                let thP = anyJobT3 ? `<th style="padding:8px;">Pekerjaan / Kode</th>` : '';
+                container.innerHTML = `
+                    <div style="font-family:sans-serif;padding:20px;color:#111;">
+                        <h2 style="margin:0;font-size:22px;font-weight:bold;">${compName}</h2>
+                        <p style="margin:2px 0 15px 0;font-size:12px;color:#555;">LAPORAN STORAN — ${dateNow}</p>
+                        <hr style="border:none;border-top:2px solid #333;margin-bottom:15px;">
+                        <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left;">
+                            <thead><tr style="background:#f1f5f9;"><th style="padding:8px;">Tanggal</th>${thP}<th style="padding:8px;">Jenis</th><th style="padding:8px;">Model</th><th style="padding:8px;">Rincian</th><th style="padding:8px;text-align:center;">Qty</th></tr></thead>
+                            <tbody>${rowsT3}</tbody>
+                        </table>
+                    </div>`;
+            } else if(tabKey === 'tab5') {
+                currentPdfTitle = `Laporan_Kiriman_Barang_${new Date().toISOString().slice(0,10)}`;
+                let sCountsPdf = {};
+                let rowsT5 = db.tab5.map(i => {
+                    let jId = i.jobId || i.kode || 'legacy'; sCountsPdf[jId] = (sCountsPdf[jId]||0)+1;
+                    let vStr = i.variants.map(v => `${v.warna}(${v.ukuran||v.size||'-'}) : <b>${v.jumlah}</b>`).join(', ');
+                    let q = i.variants.reduce((s,v)=>s+(Number(v.jumlah)||0),0);
+                    return `<tr><td style="padding:8px;border-bottom:1px solid #ddd;">${i.tanggal}</td><td style="padding:8px;border-bottom:1px solid #ddd;"><b>${i.perusahaan||'-'}</b>${i.kode?`<br><small>${i.kode}</small>`:''}</td><td style="padding:8px;border-bottom:1px solid #ddd;">${i.model||'-'}</td><td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">#${sCountsPdf[jId]}</td><td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">${i.statusKiriman||'-'}</td><td style="padding:8px;border-bottom:1px solid #ddd;">${vStr}</td><td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">${q}</td><td style="padding:8px;border-bottom:1px solid #ddd;">${i.penerima||'-'}${i.catatan?`<br><small>${i.catatan}</small>`:''}</td></tr>`;
+                }).join('');
+                container.innerHTML = `
+                    <div style="font-family:sans-serif;padding:20px;color:#111;">
+                        <h2 style="margin:0;font-size:22px;font-weight:bold;">${compName}</h2>
+                        <p style="margin:2px 0 15px 0;font-size:12px;color:#555;">SURAT / LAPORAN PENGIRIMAN BARANG — ${dateNow}</p>
+                        <hr style="border:none;border-top:2px solid #333;margin-bottom:15px;">
+                        <table style="width:100%;border-collapse:collapse;font-size:11px;text-align:left;">
+                            <thead><tr style="background:#f1f5f9;"><th style="padding:8px;">Tanggal</th><th style="padding:8px;">Perusahaan / Kode</th><th style="padding:8px;">Model</th><th style="padding:8px;text-align:center;">Seq</th><th style="padding:8px;text-align:center;">Status</th><th style="padding:8px;">Rincian Qty</th><th style="padding:8px;text-align:center;">Qty</th><th style="padding:8px;">Penerima</th></tr></thead>
+                            <tbody>${rowsT5}</tbody>
+                        </table>
+                    </div>`;
             } else {
                 container.innerHTML = `<div class="p-5 text-center text-slate-500 font-medium">Dokumen siap dicetak atau disimpan.</div>`;
             }
