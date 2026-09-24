@@ -813,6 +813,11 @@
                             </div>
 
                             <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-100 shadow-2xs">
+                                <label class="block text-sm font-extrabold text-slate-800 mb-4">Bukti Foto Pengiriman</label>
+                                <input type="file" id="t5-bukti-foto" accept="image/*" class="w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer">
+                            </div>
+
+                            <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-100 shadow-2xs">
                                 <label class="block text-sm font-extrabold text-slate-800 mb-4">Rincian Quantity Dikirim</label>
                                 <div id="container-variants-t5" class="space-y-3"><div class="text-xs text-slate-500 italic">Silakan load data pekerjaan...</div></div>
                                 <button type="button" onclick="addVariantRow('t5')" class="mt-4 text-xs bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl hover:bg-slate-100 transition shadow-2xs hidden flex items-center gap-2" id="btn-add-var-t5"><i class="fa-solid fa-plus"></i> Tambah Baris Manual</button>
@@ -1689,10 +1694,28 @@
                     </div>`;
             });
         }
-        function saveKirimanBarang(e) {
+        async function saveKirimanBarang(e) {
             e.preventDefault();
+
             const id = document.getElementById('t5-edit-id').value;
-            const obj = { id: id ? Number(id) : Date.now(), jobId: document.getElementById('t5-job-id').value, perusahaanId: document.getElementById('t5-perusahaan-id').value, perusahaan: document.getElementById('t5-perusahaan').value, kode: document.getElementById('t5-kode').value, model: document.getElementById('t5-model').value, tanggal: document.getElementById('t5-tanggal').value, statusKiriman: document.getElementById('t5-jenis').value, penerima: document.getElementById('t5-penerima').value, catatan: document.getElementById('t5-catatan').value, variants: getVariantsData('t5') };
+            const fileInput = document.getElementById('t5-bukti-foto');
+            const file = fileInput ? fileInput.files[0] : null;
+
+            // Ambil foto lama jika sedang edit
+            const oldItem = id ? db.tab5.find(x => x.id == id) : null;
+            let buktiFoto = oldItem ? oldItem.buktiFoto || '' : '';
+
+            // Jika ada foto baru, simpan sebagai Data URL
+            if (file) {
+                buktiFoto = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            const obj = { id: id ? Number(id) : Date.now(), jobId: document.getElementById('t5-job-id').value, perusahaanId: document.getElementById('t5-perusahaan-id').value, perusahaan: document.getElementById('t5-perusahaan').value, kode: document.getElementById('t5-kode').value, model: document.getElementById('t5-model').value, tanggal: document.getElementById('t5-tanggal').value, statusKiriman: document.getElementById('t5-jenis').value, penerima: document.getElementById('t5-penerima').value, catatan: document.getElementById('t5-catatan').value, buktiFoto: buktiFoto, variants: getVariantsData('t5') };
             if(!obj.jobId || obj.variants.length===0) { showModal("Peringatan", "Load Job terlebih dahulu.", false); return; }
             if(id) { const idx = db.tab5.findIndex(x => x.id == id); if(idx!==-1) db.tab5[idx] = obj; showModal("Berhasil", "Update data kiriman."); cancelEdit('t5'); } 
             else { db.tab5.push(obj); showModal("Berhasil", "Kiriman disimpan."); }
@@ -1703,6 +1726,7 @@
             const t5Tgl = document.getElementById('t5-tanggal'); if(t5Tgl) t5Tgl.value = new Date().toISOString().slice(0,10); 
             renderTableTab5(); renderKirimanSummary();
         }
+
         function renderTableTab5() {
             const tbody = document.getElementById('table-tab5'); if(!tbody) return; tbody.innerHTML = '';
             if(db.tab5.length === 0) { tbody.innerHTML = `<tr><td colspan="8" class="p-5 text-center text-slate-400 font-medium">Kosong.</td></tr>`; return; }
