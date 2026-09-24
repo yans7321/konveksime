@@ -36,6 +36,11 @@
   to = "/.netlify/functions/ledger"
   status = 200
 
+[[redirects]]
+  from = "/api/shipments"
+  to = "/.netlify/functions/shipments"
+  status = 200
+
 
 
 

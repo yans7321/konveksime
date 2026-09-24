@@ -265,6 +265,42 @@ const MIGRATIONS = [
     ],
   },
   {
+    // Phase 7 — shipments (Kiriman Barang). Records goods sent to customers.
+    // Variants are stored as jsonb (same convention as yans_pekerjaan.variants);
+    // the shipped ceiling is NEVER stored — always derived as
+    //   job.jumlah_order - SUM(shipment variant totals)   (per user, live)
+    // so a shipment can never exceed the ordered quantity. Photo fields are
+    // METADATA ONLY (name/mime/size) — bytes/base64 never reach the database;
+    // foto_storage_ref stays NULL until a storage provider is configured.
+    // job_id/perusahaan_id are nullable: legacy local rows may carry only the
+    // kode snapshot (no resolvable parent).
+    name: "0007_shipments",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS yans_shipments (
+         id              bigserial PRIMARY KEY,
+         user_id         bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         job_id          bigint REFERENCES yans_pekerjaan(id) ON DELETE SET NULL,
+         perusahaan_id   bigint REFERENCES yans_perusahaan(id) ON DELETE SET NULL,
+         tanggal         date,
+         status          text NOT NULL DEFAULT 'Selesai' CHECK (status IN ('Selesai','Belum Selesai','Bahan')),
+         penerima        text NOT NULL,
+         catatan         text,
+         variants        jsonb NOT NULL DEFAULT '[]'::jsonb,
+         foto_file_name  text,
+         foto_mime_type  text,
+         foto_size_bytes bigint,
+         foto_storage_ref text,
+         legacy_id       bigint,
+         created_at      timestamptz NOT NULL DEFAULT now(),
+         updated_at      timestamptz NOT NULL DEFAULT now(),
+         deleted_at      timestamptz,
+         CONSTRAINT yans_shipment_user_legacy_key UNIQUE (user_id, legacy_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_shipment_user_idx ON yans_shipments (user_id, deleted_at, tanggal)`,
+      `CREATE INDEX IF NOT EXISTS yans_shipment_job_idx ON yans_shipments (job_id, deleted_at)`,
+    ],
+  },
+  {
     // Phase 6 — ledger modules (expenses / kasbon / aset). Simple user-scoped
     // ledgers with no cross-references. legacy_id mirrors the localStorage row
     // id (Date.now()) so Phase 8 historical import can upsert idempotently.

@@ -39,7 +39,7 @@ function makeDriver() {
         return [
           { name: "0001_foundation_tables" }, { name: "0002_jobs" },
           { name: "0003_tailoring_pickups" }, { name: "0004_storages" },
-          { name: "0006_ledger_modules" },
+          { name: "0006_ledger_modules" }, { name: "0007_shipments" },
         ];
       }
       if (/INSERT INTO yans_migrations/.test(t)) return [];

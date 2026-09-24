@@ -41,6 +41,7 @@
     <script src="app-pickups.js" defer></script>
     <script src="app-storages.js" defer></script>
     <script src="app-ledger.js" defer></script>
+    <script src="app-shipments.js" defer></script>
 </head>
 <body class="min-h-screen antialiased bg-[#F8FAFC] text-slate-900">
 
@@ -852,7 +853,32 @@
                             </table>
                         </div>
                     </div>
-                </section>
+                                <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden mt-6">
+                    <div class="px-5 py-4 bg-slate-50/80 border-b border-slate-200/80 flex justify-between items-center">
+                        <h3 class="font-extrabold text-sm text-slate-900 uppercase tracking-wide">Sisa Belum Dikirim (Live Server)</h3>
+                        <span id="t5-server-status" class="text-[11px] font-semibold text-slate-500"></span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead><tr class="text-slate-400 border-b border-slate-100 uppercase tracking-wider font-bold"><th class="p-3">Pekerjaan</th><th class="p-3">Perusahaan</th><th class="p-3 text-center">Order</th><th class="p-3 text-center">Terkirim</th><th class="p-3 text-center">Sisa</th></tr></thead>
+                            <tbody id="table-t5-shippable" class="divide-y divide-slate-50 text-slate-700 font-medium"><tr><td colspan="5" class="p-5 text-center text-slate-400 font-medium">Memuat data pekerjaan...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden mt-6">
+                    <div class="px-5 py-4 bg-slate-50/80 border-b border-slate-200/80 flex justify-between items-center">
+                        <h3 class="font-extrabold text-sm text-slate-900 uppercase tracking-wide">Riwayat Transaksi Kiriman</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead><tr class="text-slate-400 border-b border-slate-100 uppercase tracking-wider font-bold"><th class="p-3">Tanggal</th><th class="p-3">Pekerjaan</th><th class="p-3">Perusahaan</th><th class="p-3 text-center">Jumlah Kirim</th><th class="p-3 text-center">ID Transaksi</th></tr></thead>
+                            <tbody id="table-t5-history" class="divide-y divide-slate-50 text-slate-700 font-medium"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
 
                 <section id="view-tab4" class="space-y-6 hidden">
                     <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 lg:p-8 relative">
@@ -1747,7 +1773,7 @@
                         <td class="p-3 font-semibold text-slate-600">${i.penerima}</td>
                         <td class="p-3 text-center flex justify-center gap-2">
                             <button onclick="editKirimanBarang(${i.id})" class="text-blue-600 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg shadow-2xs font-bold transition">Edit</button>
-                            <button onclick="deleteItem('tab5', ${item.id})" class="text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg font-bold transition">Hapus</button>
+                            <button onclick="deleteItem('tab5', ${i.id})" class="text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg font-bold transition">Hapus</button>
                         </td>
                     </tr>`;
             });

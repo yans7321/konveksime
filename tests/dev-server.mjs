@@ -21,6 +21,7 @@ const ROUTES = {
   "/api/tailoring-pickups": "./netlify/functions/pickups.mjs",
   "/api/storages": "./netlify/functions/storages.mjs",
   "/api/ledger": "./netlify/functions/ledger.mjs",
+  "/api/shipments": "./netlify/functions/shipments.mjs",
   "/api/job-accessories": "./netlify/functions/job-items.mjs",
   "/api/job-documents": "./netlify/functions/job-items.mjs",
 };
