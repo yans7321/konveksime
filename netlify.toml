@@ -31,7 +31,13 @@
 [[redirects]]
   from = "/api/storages"
   to = "/.netlify/functions/storages"
+  status = 200[[redirects]]
+  from = "/api/ledger"
+  to = "/.netlify/functions/ledger"
   status = 200
+
+
+
 
 [[redirects]]
   from = "/api/job-accessories"

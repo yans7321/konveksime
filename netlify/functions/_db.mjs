@@ -265,6 +265,56 @@ const MIGRATIONS = [
     ],
   },
   {
+    // Phase 6 — ledger modules (expenses / kasbon / aset). Simple user-scoped
+    // ledgers with no cross-references. legacy_id mirrors the localStorage row
+    // id (Date.now()) so Phase 8 historical import can upsert idempotently.
+    // Soft delete keeps audit history; amounts are positive numerics (a spend
+    // direction is part of the module's meaning, not a signed column).
+    name: "0006_ledger_modules",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS yans_expenses (
+         id         bigserial PRIMARY KEY,
+         user_id    bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         tanggal    date,
+         kategori   text,
+         keterangan text NOT NULL,
+         nominal    numeric(16,2) NOT NULL CHECK (nominal > 0),
+         legacy_id  bigint,
+         created_at timestamptz NOT NULL DEFAULT now(),
+         updated_at timestamptz NOT NULL DEFAULT now(),
+         deleted_at timestamptz,
+         CONSTRAINT yans_expense_user_legacy_key UNIQUE (user_id, legacy_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_expense_user_idx ON yans_expenses (user_id, deleted_at, tanggal)`,
+      `CREATE TABLE IF NOT EXISTS yans_kasbon (
+         id         bigserial PRIMARY KEY,
+         user_id    bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         tanggal    date,
+         keterangan text NOT NULL,
+         jumlah     numeric(16,2) NOT NULL CHECK (jumlah > 0),
+         legacy_id  bigint,
+         created_at timestamptz NOT NULL DEFAULT now(),
+         updated_at timestamptz NOT NULL DEFAULT now(),
+         deleted_at timestamptz,
+         CONSTRAINT yans_kasbon_user_legacy_key UNIQUE (user_id, legacy_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_kasbon_user_idx ON yans_kasbon (user_id, deleted_at, tanggal)`,
+      `CREATE TABLE IF NOT EXISTS yans_aset (
+         id         bigserial PRIMARY KEY,
+         user_id    bigint NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+         tanggal    date,
+         nama       text NOT NULL,
+         harga      numeric(16,2) NOT NULL CHECK (harga > 0),
+         legacy_id  bigint,
+         created_at timestamptz NOT NULL DEFAULT now(),
+         updated_at timestamptz NOT NULL DEFAULT now(),
+         deleted_at timestamptz,
+         CONSTRAINT yans_aset_user_legacy_key UNIQUE (user_id, legacy_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS yans_aset_user_idx ON yans_aset (user_id, deleted_at, tanggal)`,
+    ],
+  },
+  {
     // Phase 3 — tailoring pickups (Ambil Jahit). Transaction layer on top of
     // Phase 2 jobs: each row records one controlled take of job quantity.
     // Available quantity is NEVER stored — always derived as

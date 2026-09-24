@@ -75,7 +75,7 @@ function makeDriver() {
       if (/pg_advisory_xact_lock/.test(t)) return [];
       if (/CREATE TABLE IF NOT EXISTS yans_migrations/.test(t)) return [];
       if (/SELECT name FROM yans_migrations/.test(t)) {
-        return [{ name: "0001_foundation_tables" }, { name: "0002_jobs" }, { name: "0003_tailoring_pickups" }, { name: "0004_storages" }];
+        return [{ name: "0001_foundation_tables" }, { name: "0002_jobs" }, { name: "0003_tailoring_pickups" }, { name: "0004_storages" }, { name: "0006_ledger_modules" }];
       }
       if (/INSERT INTO yans_migrations/.test(t)) return [];
 
