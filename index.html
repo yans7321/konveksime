@@ -37,6 +37,7 @@
     </style>
     <link rel="stylesheet" href="styles.css">
     <script src="app-format.js" defer></script>
+    <script src="app-integrity.js" defer></script>
     <script src="app-api.js" defer></script>
     <script src="app-jobs.js" defer></script>
     <script src="app-pickups.js" defer></script>
@@ -1655,6 +1656,15 @@
                 variants: getVariantsData('t2')
             };
             if(obj.variants.length===0) { showModal("Peringatan", "Minimal 1 rincian.", false); return; }
+            // Local ceiling validation (same rule as the server):
+            // available = jumlah_order - SUM(pickup) for this job.
+            if (window.YansIntegrity) {
+                const jobT2 = db.tab1.find(x => x.id == obj.jobId) || (obj.kode ? db.tab1.find(x => (x.kodePekerjaan||'') === obj.kode) : null);
+                if (jobT2) {
+                    const cek = window.YansIntegrity.checkPickup(jobT2, window.YansIntegrity.sumVariants(obj), { pickups: db.tab2, excludeId: id ? Number(id) : null });
+                    if (!cek.ok) { showModal("Stok Tidak Cukup", cek.message, false); return; }
+                }
+            }
             if(id) { const idx = db.tab2.findIndex(x => x.id == id); if(idx!==-1) db.tab2[idx] = obj; showModal("Berhasil", "Diperbarui."); cancelEdit('t2'); } 
             else { db.tab2.push(obj); showModal("Berhasil", "Disimpan."); }
             saveData(); 
@@ -1722,6 +1732,15 @@
             const id = document.getElementById('t3-edit-id').value;
             const obj = { id: id ? Number(id) : Date.now(), ambilId: document.getElementById('t3-ambil-id').value, jobId: document.getElementById('t3-job-id').value, tanggal: document.getElementById('t3-tanggal').value, tukang: document.getElementById('t3-tukang').value, jenis: document.getElementById('t3-jenis').value, model: document.getElementById('t3-model').value, variants: getVariantsData('t3') };
             if(!obj.tukang || obj.variants.length===0) { showModal("Peringatan", "Load data pengambilan terlebih dahulu.", false); return; }
+            // Local ceiling validation (same rule as the server):
+            // pendingStorage = total pickup - total storan for this job/pickup.
+            if (window.YansIntegrity) {
+                const pickupT3 = db.tab2.find(x => x.id == obj.ambilId);
+                if (pickupT3) {
+                    const cek = window.YansIntegrity.checkStoran(pickupT3, window.YansIntegrity.sumVariants(obj), { pickups: db.tab2, storages: db.tab3, excludeId: id ? Number(id) : null });
+                    if (!cek.ok) { showModal("Storan Ditolak", cek.message, false); return; }
+                }
+            }
             if(id) { const idx = db.tab3.findIndex(x => x.id == id); if(idx!==-1) db.tab3[idx] = obj; showModal("Berhasil", "Update."); cancelEdit('t3'); } 
             else { db.tab3.push(obj); showModal("Berhasil", "Tersimpan."); }
             saveData(); 
@@ -1812,6 +1831,16 @@
 
             const obj = { id: id ? Number(id) : Date.now(), jobId: document.getElementById('t5-job-id').value, perusahaanId: document.getElementById('t5-perusahaan-id').value, perusahaan: document.getElementById('t5-perusahaan').value, kode: document.getElementById('t5-kode').value, model: document.getElementById('t5-model').value, tanggal: document.getElementById('t5-tanggal').value, statusKiriman: document.getElementById('t5-jenis').value, penerima: document.getElementById('t5-penerima').value, catatan: document.getElementById('t5-catatan').value, buktiFoto: buktiFoto, variants: getVariantsData('t5') };
             if(!obj.jobId || obj.variants.length===0) { showModal("Peringatan", "Load Job terlebih dahulu.", false); return; }
+            // Local ceiling validation (same rule as the server):
+            // sisa = jumlah_order - SUM(kiriman) for this job. Valid new
+            // transactions only - historical rows are never modified here.
+            if (window.YansIntegrity) {
+                const jobT5 = db.tab1.find(x => x.id == obj.jobId) || (obj.kode ? db.tab1.find(x => (x.kodePekerjaan||'') === obj.kode) : null);
+                if (jobT5) {
+                    const cek = window.YansIntegrity.checkShip(jobT5, window.YansIntegrity.sumVariants(obj), { shipments: db.tab5, excludeId: id ? Number(id) : null });
+                    if (!cek.ok) { showModal("Stok Tidak Cukup", cek.message, false); return; }
+                }
+            }
             if(id) { const idx = db.tab5.findIndex(x => x.id == id); if(idx!==-1) db.tab5[idx] = obj; showModal("Berhasil", "Update data kiriman."); cancelEdit('t5'); } 
             else { db.tab5.push(obj); showModal("Berhasil", "Kiriman disimpan."); }
             saveData(); 
@@ -1849,7 +1878,12 @@
         function renderKirimanSummary() {
             const cont = document.getElementById('kiriman-summary-box'); if(!cont) return; cont.innerHTML = ''; if(db.tab1.length === 0) return;
             db.tab1.forEach(job => {
-                let tOrder = job.variants.reduce((s,v)=>s+(Number(v.jumlah)||0),0); let kList = db.tab5.filter(k => k.jobId == job.id || (k.kode && k.kode === job.kodePekerjaan)); if(kList.length===0) return; 
+                let tOrder = job.variants.reduce((s,v)=>s+(Number(v.jumlah)||0),0);
+                // Identity rule (app-integrity.js): a transaction with a jobId
+                // counts for that job only; kode is a fallback for legacy rows
+                // without jobId - so one transaction is never counted twice.
+                let kList = window.YansIntegrity ? db.tab5.filter(k => window.YansIntegrity.txBelongsToJob(k, job)) : db.tab5.filter(k => k.jobId == job.id || (k.kode && k.kode === job.kodePekerjaan));
+                if(kList.length===0) return;
                 let tKirim = kList.reduce((sum,k) => sum + k.variants.reduce((s,v)=>s+(Number(v.jumlah)||0),0), 0); let sisa = tOrder - tKirim; let isOver = sisa < 0;
                 cont.innerHTML += `
                     <div class="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs relative overflow-hidden">
@@ -1857,6 +1891,7 @@
                         <div class="flex justify-between items-center mb-3">
                             <div><span class="text-[10px] font-black uppercase tracking-wider text-blue-600 block">${job.kodePekerjaan}</span><h4 class="font-extrabold text-slate-900 text-sm truncate max-w-[150px]">${job.model}</h4></div>
                             <span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-black border border-slate-200">${kList.length}x Kirim</span>
+                            ${(() => { if (window.YansIntegrity) { const st = window.YansIntegrity.computeShipmentStats(job, db.tab5); if (st.over) return '<span class="absolute right-3 top-3 px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[9px] font-black">Data historis melebihi jumlah order</span>'; } return ''; })()}
                         </div>
                         <div class="grid grid-cols-3 gap-3 text-center">
                             <div class="bg-slate-50 p-2.5 rounded-2xl border border-slate-100"><span class="block text-[10px] font-bold text-slate-500 uppercase">Order</span><span class="font-black text-slate-900 text-sm">${tOrder}</span></div>
