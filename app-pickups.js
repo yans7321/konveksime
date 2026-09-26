@@ -126,19 +126,37 @@
 
   // ---------- History (server only; local rows already in table-tab2) ----------
 
+  function fmtDate(v) {
+    // Server DATE columns can arrive as JS Date objects — format DD/MM/YYYY
+    // via the shared helper (fallback to a local formatter if it is absent).
+    if (typeof window !== "undefined" && window.YansDate && window.YansDate.fmtDmy) return window.YansDate.fmtDmy(v);
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return "";
+      return String(v.getDate()).padStart(2, "0") + "/" + String(v.getMonth() + 1).padStart(2, "0") + "/" + v.getFullYear();
+    }
+    return String(v == null ? "" : v).slice(0, 10);
+  }
+
   function renderHistory(items) {
     var tbody = el("table-t2-history");
     if (!tbody) return;
+    var startEl = el("t2-server-history-start");
+    var endEl = el("t2-server-history-end");
+    var startIso = startEl && startEl.value ? startEl.value : null;
+    var endIso = endEl && endEl.value ? endEl.value : null;
+    var useRange = typeof window !== "undefined" && window.YansDate && !!startIso;
+    var inRange = window.YansDate ? window.YansDate.inDateRange : function () { return true; };
     tbody.innerHTML = "";
     if (!items || items.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" class="p-5 text-center text-slate-400 font-medium">Belum ada transaksi pengambilan terdaftar.</td></tr>';
       return;
     }
     items.forEach(function (k) {
+      if (useRange && !inRange(k.pickedUpAt, startIso, endIso)) return;
       var tr = document.createElement("tr");
       tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
       tr.innerHTML =
-        '<td class="p-3 text-slate-500">' + escapeHtml(String(k.pickedUpAt || "").slice(0, 10)) + "</td>" +
+        '<td class="p-3 text-slate-500">' + fmtDate(k.pickedUpAt) + "</td>" +
         '<td class="p-3"><span class="font-bold text-slate-900 block">' + escapeHtml(k.namaPekerjaan || "-") + '</span><span class="text-[10px] font-bold text-blue-600">' + escapeHtml(k.jobCode || "-") + "</span></td>" +
         '<td class="p-3 text-slate-600">' + escapeHtml(k.perusahaanNama || "-") + "</td>" +
         '<td class="p-3 font-bold text-slate-800">' + escapeHtml(k.tukang || "-") + "</td>" +

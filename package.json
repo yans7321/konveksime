@@ -5,7 +5,7 @@
   "description": "Konveksi YANS ERP Control Center (static app + Netlify Functions + PostgreSQL)",
   "scripts": {
     "db:migrate": "node netlify/functions/_migrate.mjs",
-    "test": "node --test tests/netlify-toml.test.mjs tests/phase1.mjs tests/phase2.mjs tests/phase3.mjs tests/phase4.mjs tests/phase6.mjs tests/phase7.mjs tests/http.test.mjs",
+    "test": "node --test tests/netlify-toml.test.mjs tests/phase1.mjs tests/phase2.mjs tests/phase3.mjs tests/phase4.mjs tests/phase6.mjs tests/phase7.mjs tests/polish.mjs tests/http.test.mjs",
     "serve": "node tests/dev-server.mjs"
   },
   "dependencies": {

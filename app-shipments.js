@@ -101,20 +101,36 @@
 
   // ---------- History (server mirror rows) ----------
 
+  function fmtDate(v) {
+    if (typeof window !== "undefined" && window.YansDate && window.YansDate.fmtDmy) return window.YansDate.fmtDmy(v);
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return "";
+      return String(v.getDate()).padStart(2, "0") + "/" + String(v.getMonth() + 1).padStart(2, "0") + "/" + v.getFullYear();
+    }
+    return String(v == null ? "" : v).slice(0, 10);
+  }
+
   function renderHistory(items) {
     var tbody = el("table-t5-history");
     if (!tbody) return;
+    var startEl = el("t5-server-history-start");
+    var endEl = el("t5-server-history-end");
+    var startIso = startEl && startEl.value ? startEl.value : null;
+    var endIso = endEl && endEl.value ? endEl.value : null;
+    var useRange = typeof window !== "undefined" && window.YansDate && !!startIso;
+    var inRange = window.YansDate ? window.YansDate.inDateRange : function () { return true; };
     tbody.innerHTML = "";
     if (!items || items.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-slate-400 font-medium">Belum ada transaksi kiriman terdaftar.</td></tr>';
       return;
     }
     items.forEach(function (s) {
+      if (useRange && !inRange(s.tanggal, startIso, endIso)) return;
       var qty = (s.variants || []).reduce(function (a, v) { return a + (Number(v.jumlah) || 0); }, 0);
       var tr = document.createElement("tr");
       tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
       tr.innerHTML =
-        '<td class="p-3 text-slate-500">' + escapeHtml(String(s.tanggal || "").slice(0, 10)) + "</td>" +
+        '<td class="p-3 text-slate-500">' + fmtDate(s.tanggal) + "</td>" +
         '<td class="p-3"><span class="font-bold text-slate-900 block">' + escapeHtml(s.namaPekerjaan || "-") + '</span><span class="text-[10px] font-bold text-blue-600">' + escapeHtml(s.jobCode || "-") + "</span></td>" +
         '<td class="p-3 text-slate-600">' + escapeHtml(s.perusahaanNama || "-") + "</td>" +
         '<td class="p-3 text-center font-black text-indigo-600">' + qty + "</td>" +

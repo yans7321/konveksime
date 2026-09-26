@@ -104,6 +104,14 @@
       existing = db.users.find(function (x) {
         return (x.username || "").toLowerCase() === localName.toLowerCase();
       });
+      if (!existing) {
+        // Also match via the stored server-account map (username renamed
+        // locally, or the mirror row carries dbId from a prior session).
+        try {
+          var umap = JSON.parse(localStorage.getItem("yans_dbmap_user")) || {};
+          if (umap.dbId) existing = db.users.find(function (x) { return x.dbId == umap.dbId; });
+        } catch (e2) { /* ignore */ }
+      }
     }
     // Keep local permissions when the account already exists locally (localStorage
     // stays authoritative for member management in Phase 1).
@@ -144,7 +152,14 @@
     }
     api("me")
       .then(function (res) {
-        if (res && res.user) applySession({ user: res.user, token: t });
+        if (res && res.user) {
+          applySession({ user: res.user, token: t });
+          // Refresh the local Pekerjaan mirror (and the local<->server job id
+          // map) right after the session is restored.
+          if (typeof window.YansJobs !== "undefined" && window.YansJobs.pullJobs) {
+            try { window.YansJobs.pullJobs(); } catch (e2) { /* best effort */ }
+          }
+        }
         else setToken(null);
         if (typeof checkAuth === "function") checkAuth();
       })
@@ -158,6 +173,39 @@
 
   function isServerUnavailable(err) {
     return !err || !err.status || err.status === 0 || err.status === 503 || err.code === "db_not_configured" || err.code === "network";
+  }
+
+  // Maps a server account to its local mirror row so applySession() updates
+  // the existing local user (keeping its permissions) instead of appending a
+  // duplicate entry to the member list.
+  function saveServerUserMap(res) {
+    try {
+      if (!res || !res.user) return;
+      var key = String(res.user.username || res.user.email || "").toLowerCase();
+      if (!key) return;
+      localStorage.setItem("yans_dbmap_user", JSON.stringify({ key: key, dbId: res.user.id }));
+    } catch (e) { /* ignore */ }
+  }
+
+  // Upserts a legacy localStorage-only account into app_users so the SAME
+  // credentials work in any browser (server becomes reachable for panels like
+  // Ambil Jahit/Storan/Kiriman history). Best effort: failure (offline, 409
+  // taken, db unconfigured) never blocks the local sign-in flow.
+  function ensureServerAccount(username, password, name) {
+    if (!username || !password) return Promise.resolve(null);
+    return api("register", { name: name || username, username: username, password: password })
+      .then(function (res) {
+        saveServerUserMap(res);
+        if (res && res.user && typeof db !== "undefined" && Array.isArray(db.users)) {
+          var local = db.users.find(function (x) {
+            return (x.username || "").toLowerCase() === String(res.user.username || "").toLowerCase();
+          });
+          if (local) local.dbId = res.user.id;
+          if (typeof saveData === "function") saveData();
+        }
+        return res;
+      })
+      .catch(function () { return null; });
   }
 
   function showAuthError(msg) {
@@ -192,9 +240,28 @@
       })
       .catch(function (err) {
         // 401 also falls back so accounts that only exist in localStorage
-        // (created before Phase 1) can still sign in; the server row is
-        // upserted on the next successful server-authenticated action.
-        if (isServerUnavailable(err) || err.status === 401) return original(e);
+        // (created before Phase 1) can still sign in; on a successful local
+        // match the account is mirrored to the server (new scrypt hash of the
+        // just-typed password) and the session is established, so the same
+        // credentials now work in any browser and server panels go live.
+        if (isServerUnavailable(err) || err.status === 401) {
+          var result = original(e);
+          if (err.status === 401 && typeof db !== "undefined" && Array.isArray(db.users)) {
+            var matched = db.users.find(function (x) { return x.username === uname && x.password === pass; });
+            if (matched && !matched.dbId) {
+              ensureServerAccount(matched.username, pass, matched.name || matched.username)
+                .then(function (res) {
+                  if (res && res.user) return api("login", { username: matched.username, password: pass });
+                  return null;
+                })
+                .then(function (res2) {
+                  if (res2 && res2.user) { applySession(res2); scheduleSync(); }
+                })
+                .catch(function () { /* best effort; local login stands */ });
+            }
+          }
+          return result;
+        }
         showAuthError(err.message || "Login gagal.");
       });
   });
@@ -212,6 +279,7 @@
     api("register", { name: name, username: uname, password: pass })
       .then(function (res) {
         applySession(res);
+        saveServerUserMap(res);
         scheduleSync();
       })
       .catch(function (err) {
@@ -353,12 +421,23 @@
   function scheduleSync() {
     // Run shortly after login so the first sync does not block rendering.
     if (syncTimer) clearTimeout(syncTimer);
-    syncTimer = setTimeout(function () { syncNow(); }, 1200);
+    syncTimer = setTimeout(function () {
+      syncNow();
+      // Mirror server-created jobs into the local Pekerjaan list (fills
+      // yans_dbmap_pekerjaan so Ambil/Storan/Kiriman resolve server job ids).
+      if (typeof window.YansJobs !== "undefined" && window.YansJobs.pullJobs) {
+        try { window.YansJobs.pullJobs(); } catch (e) { /* best effort */ }
+      }
+    }, 1200);
   }
 
   window.YansApi = {
     restoreSession: restoreSession,
     syncNow: syncNow,
+    pullJobs: function () {
+      if (window.YansJobs && window.YansJobs.pullJobs) return window.YansJobs.pullJobs();
+      return Promise.resolve({ ok: false, reason: "unavailable" });
+    },
     status: function () {
       var signedIn = typeof db !== "undefined" && !!db.currentUser;
       return {

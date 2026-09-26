@@ -36,6 +36,7 @@
         .glass-header { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
     </style>
     <link rel="stylesheet" href="styles.css">
+    <script src="app-format.js" defer></script>
     <script src="app-api.js" defer></script>
     <script src="app-jobs.js" defer></script>
     <script src="app-pickups.js" defer></script>
@@ -518,11 +519,17 @@
                                         <th class="p-3 font-bold">Model</th>
                                         <th class="p-3 font-bold">Rincian</th>
                                         <th class="p-3 font-bold text-center">Total Qty</th>
-                                        <th class="p-3 font-bold text-right hidden sm:table-cell">Nilai Total</th>
                                         <th class="p-3 font-bold text-center">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody id="table-tab1" class="divide-y divide-slate-50 text-slate-700 font-medium"></tbody>
+                                    <tfoot>
+                                        <tr class="bg-slate-50 border-t-2 border-slate-200">
+                                            <td colspan="4" class="p-3 text-right font-extrabold uppercase tracking-wider text-xs text-slate-500">Total Qty (daftar tampil)</td>
+                                            <td class="p-3 text-center font-black text-blue-700 text-base"><span id="tab1-total-qty">0</span></td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
                             </table>
                         </div>
                     </div>
@@ -633,6 +640,17 @@
                     <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
                         <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-50/50">
                             <div><h3 class="font-extrabold text-slate-900 text-lg">Riwayat Pengambilan Aktif</h3></div>
+                            <div class="flex flex-wrap items-end gap-3">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Dari Tanggal</label>
+                                    <input type="date" id="t2-history-start" onchange="renderTableTab2()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sampai Tanggal</label>
+                                    <input type="date" id="t2-history-end" onchange="renderTableTab2()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none">
+                                </div>
+                                <button type="button" onclick="YansPickups.refresh()" class="bg-white text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition shadow-2xs"><i class="fa-solid fa-rotate text-blue-600"></i> Muat Ulang Server</button>
+                            </div>
                             <button onclick="openPreview('tab2')" class="bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition shadow-2xs flex items-center gap-2"><i class="fa-solid fa-eye text-blue-600"></i> Preview / Download</button>
                         </div>
                         <div class="overflow-x-auto p-4">
@@ -658,6 +676,16 @@
                     <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
                         <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-50/50">
                             <div><h3 class="font-extrabold text-slate-900 text-lg">Riwayat Transaksi Pengambilan</h3></div>
+                            <div class="flex flex-wrap items-end gap-3">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Dari Tanggal</label>
+                                    <input type="date" id="t2-server-history-start" onchange="YansPickups.refresh()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sampai Tanggal</label>
+                                    <input type="date" id="t2-server-history-end" onchange="YansPickups.refresh()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none">
+                                </div>
+                            </div>
                             <button onclick="YansPickups.refresh()" class="bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition shadow-2xs flex items-center gap-2"><i class="fa-solid fa-rotate text-blue-600"></i> Muat Ulang</button>
                         </div>
                         <div class="overflow-x-auto p-4">
@@ -743,6 +771,17 @@
                     <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
                         <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-50/50">
                             <div><h3 class="font-extrabold text-slate-900 text-lg">Riwayat Storan</h3></div>
+                            <div class="flex flex-wrap items-end gap-3">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Dari Tanggal</label>
+                                    <input type="date" id="t3-history-start" onchange="renderTableTab3()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sampai Tanggal</label>
+                                    <input type="date" id="t3-history-end" onchange="renderTableTab3()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 outline-none">
+                                </div>
+                                <button type="button" onclick="YansStorages.refresh()" class="bg-white text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition shadow-2xs"><i class="fa-solid fa-rotate text-emerald-600"></i> Muat Ulang Server</button>
+                            </div>
                             <button onclick="openPreview('tab3')" class="bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition shadow-2xs flex items-center gap-2"><i class="fa-solid fa-eye text-blue-600"></i> Preview / Download</button>
                         </div>
                         <div class="overflow-x-auto p-4">
@@ -766,6 +805,16 @@
                     <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
                         <div class="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-50/50">
                             <div><h3 class="font-extrabold text-slate-900 text-lg">Riwayat Transaksi Storan</h3></div>
+                            <div class="flex flex-wrap items-end gap-3">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Dari Tanggal</label>
+                                    <input type="date" id="t3-server-history-start" onchange="YansStorages.refresh()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sampai Tanggal</label>
+                                    <input type="date" id="t3-server-history-end" onchange="YansStorages.refresh()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 outline-none">
+                                </div>
+                            </div>
                         </div>
                         <div class="overflow-x-auto p-4">
                             <table class="w-full text-left text-sm whitespace-nowrap">
@@ -869,7 +918,18 @@
                 <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden mt-6">
                     <div class="px-5 py-4 bg-slate-50/80 border-b border-slate-200/80 flex justify-between items-center">
                         <h3 class="font-extrabold text-sm text-slate-900 uppercase tracking-wide">Riwayat Transaksi Kiriman</h3>
+                        <div class="flex flex-wrap items-end gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Dari Tanggal</label>
+                                <input type="date" id="t5-server-history-start" onchange="YansShipments.refresh()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sampai Tanggal</label>
+                                <input type="date" id="t5-server-history-end" onchange="YansShipments.refresh()" class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none">
+                            </div>
+                        </div>
                     </div>
+
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs whitespace-nowrap">
                             <thead><tr class="text-slate-400 border-b border-slate-100 uppercase tracking-wider font-bold"><th class="p-3">Tanggal</th><th class="p-3">Pekerjaan</th><th class="p-3">Perusahaan</th><th class="p-3 text-center">Jumlah Kirim</th><th class="p-3 text-center">ID Transaksi</th></tr></thead>
@@ -991,6 +1051,7 @@
                             <div><label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Dari Tanggal</label><input type="date" id="pl-start-date" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500/20 outline-none"></div>
                             <div><label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Sampai Tanggal</label><input type="date" id="pl-end-date" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500/20 outline-none"></div>
                             <div><button type="button" onclick="renderProfitLossSection()" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-emerald-700 transition shadow-md">Kalkulasi P&L</button></div>
+                             <div><button type="button" onclick="renderTableTab6()" class="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-slate-800 transition shadow-md">Kalkulasi Ulang</button></div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
                             <div class="bg-blue-50/80 p-6 rounded-3xl border border-blue-200 flex flex-col justify-center shadow-2xs relative overflow-hidden"><i class="fa-solid fa-arrow-trend-up absolute -right-4 -bottom-4 text-7xl text-blue-100 opacity-50"></i><span class="text-xs font-bold uppercase tracking-wider text-blue-800 mb-1 relative z-10">Total Pendapatan (Revenue)</span><h4 id="pl-total-rev" class="text-2xl lg:text-3xl font-extrabold text-blue-700 tracking-tight relative z-10">Rp 0</h4></div>
@@ -1539,9 +1600,11 @@
         }
         function renderTableTab1() {
             const tbody = document.getElementById('table-tab1'); if(!tbody) return; tbody.innerHTML = '';
-            if(db.tab1.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="p-5 text-center text-slate-400 font-medium">Kosong.</td></tr>`; return; }
+            let totalQtyDisplayed = 0;
+            if(db.tab1.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-slate-400 font-medium">Kosong.</td></tr>`; }
             db.tab1.forEach(item => {
                 let tQty = item.variants.reduce((s, v) => s + (Number(v.jumlah)||0), 0);
+                totalQtyDisplayed += tQty; const t1Foot = document.getElementById('tab1-total-qty'); if(t1Foot) t1Foot.innerText = totalQtyDisplayed;
                 let pNama = item.perusahaanNama || (db.perusahaan.find(x=>x.id==item.perusahaanId)?.nama) || '-';
                 let vHtml = item.variants.map(v => `<span class="inline-block bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold mr-1 mb-1">${v.warna}(${v.ukuran||v.size||'-'}): <b class="text-blue-700">${v.jumlah}</b></span>`).join('');
                 tbody.innerHTML += `
@@ -1551,8 +1614,7 @@
                         <td class="p-3 font-bold text-slate-800">${item.model}</td>
                         <td class="p-3 max-w-[200px] whitespace-normal">${vHtml}</td>
                         <td class="p-3 text-center font-black text-slate-900">${tQty}</td>
-                        <td class="p-3 text-right font-black text-emerald-600 hidden sm:table-cell">${formatRp(tQty*(Number(item.harga)||0))}</td>
-                        <td class="p-3 text-center flex justify-center gap-2">
+                          <td class="p-3 text-center flex justify-center gap-2">
                             <button onclick="editOrderKantor(${item.id})" class="text-blue-600 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg shadow-2xs font-bold transition">Edit</button>
                             <button onclick="deleteItem('tab1', ${item.id})" class="text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg font-bold transition">Hapus</button>
                         </td>
@@ -1607,12 +1669,15 @@
             let sJobAmbil = document.getElementById('select-job-for-ambil');
             if(sJobAmbil) { let cur = sJobAmbil.value; sJobAmbil.innerHTML = '<option value="">-- Kosongkan / Ketik Manual --</option>'; db.tab1.forEach(j => sJobAmbil.innerHTML += `<option value="${j.id}">[${j.kodePekerjaan||'-'}] ${j.model}</option>`); sJobAmbil.value = cur; }
 
+            const t2Hs = document.getElementById('t2-history-start'), t2He = document.getElementById('t2-history-end');
+            const t2Start = t2Hs ? t2Hs.value : '', t2End = t2He ? t2He.value : '';
             db.tab2.forEach(item => {
+                if (!YansDate.inDateRange(item.tanggal, t2Start, t2End)) return;
                 let tQty = item.variants.reduce((s, v) => s + (Number(v.jumlah)||0), 0);
                 let vHtml = item.variants.map(v => `<span class="inline-block bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold mr-1 mb-1">${v.warna}(${v.ukuran||v.size||'-'}): <b class="text-amber-700">${v.jumlah}</b></span>`).join('');
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-                        <td class="p-3 text-slate-500">${item.tanggal}</td>
+                        <td class="p-3 text-slate-500">${showDate(item.tanggal)}</td>
                         <td class="p-3 font-bold text-slate-900">${item.tukang}</td>
                         <td class="p-3"><span class="px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-wider">${item.jenis}</span><br><span class="text-[10px] font-bold text-slate-400 mt-1 block">${item.kode||'-'}</span></td>
                         <td class="p-3 font-bold text-slate-800">${item.model}</td>
@@ -1668,12 +1733,15 @@
         function renderTableTab3() {
             const tbody = document.getElementById('table-tab3'); if(!tbody) return; tbody.innerHTML = '';
             if(db.tab3.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="p-5 text-center text-slate-400 font-medium">Kosong.</td></tr>`; return; }
+            const t3Hs = document.getElementById('t3-history-start'), t3He = document.getElementById('t3-history-end');
+            const t3Start = t3Hs ? t3Hs.value : '', t3End = t3He ? t3He.value : '';
             db.tab3.forEach(item => {
+                if (!YansDate.inDateRange(item.tanggal, t3Start, t3End)) return;
                 let tQty = item.variants.reduce((s, v) => s + (Number(v.jumlah)||0), 0);
                 let vHtml = item.variants.map(v => `<span class="inline-block bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold mr-1 mb-1">${v.warna}(${v.ukuran||v.size||'-'}): <b class="text-emerald-700">${v.jumlah}</b></span>`).join('');
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-                        <td class="p-3 text-slate-500">${item.tanggal}</td>
+                        <td class="p-3 text-slate-500">${showDate(item.tanggal)}</td>
                         <td class="p-3 font-bold text-slate-900">${item.tukang}</td>
                         <td class="p-3 font-bold text-slate-800">${item.model} <span class="block mt-1 px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-[9px] font-black uppercase inline-block">${item.jenis}</span></td>
                         <td class="p-3 max-w-[200px] whitespace-normal">${vHtml}</td>
@@ -1850,7 +1918,7 @@
                     let q = Number(v.jumlah)||0; let sub = q*h; tPcs+=q; tUpah+=sub;
                     rows += `
                         <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-sm">
-                            <td class="p-3 text-slate-500">${a.tanggal}</td>
+                            <td class="p-3 text-slate-500">${showDate(a.tanggal)}</td>
                             <td class="p-3"><span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-wider border border-slate-200">${a.jenis}</span></td>
                             <td class="p-3 font-bold text-slate-800">${a.model} <span class="text-[10px] font-bold text-slate-400 block mt-1">${a.kode||'-'}</span></td>
                             <td class="p-3 font-semibold text-slate-600">${v.warna} (${v.ukuran||v.size||'-'})</td>
@@ -1863,7 +1931,7 @@
             const gKey = `gaji_${tukang}_${sd}_${ed}`; const isLunas = db.gajiStatus[gKey] === 'Lunas';
             cont.innerHTML = `
                 <div class="bg-indigo-900 text-white p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl shadow-indigo-500/20">
-                    <div><h4 class="font-bold text-lg">Slip: ${tukang}</h4><p class="text-xs font-semibold text-indigo-300">Periode: ${sd} s/d ${ed}</p></div>
+                    <div><h4 class="font-bold text-lg">Slip: ${tukang}</h4><p class="text-xs font-semibold text-indigo-300">Periode: ${showDate(sd)} s/d ${showDate(ed)}</p></div>
                     <div class="flex flex-wrap items-center gap-3">
                         <button onclick="toggleStatusGaji('${gKey}')" class="px-5 py-2.5 rounded-xl text-sm font-extrabold transition shadow-2xs border border-transparent ${isLunas?'bg-emerald-500 text-white hover:bg-emerald-600':'bg-amber-400 text-amber-950 hover:bg-amber-500'}">${isLunas?'✓ STATUS: LUNAS':'! STATUS: BELUM LUNAS'}</button>
                         <button onclick="previewGajianNota('${tukang}', '${sd}', '${ed}')" class="bg-white text-indigo-900 px-5 py-2.5 rounded-xl text-sm font-extrabold hover:bg-slate-100 transition shadow-2xs flex items-center gap-2"><i class="fa-solid fa-eye text-blue-600"></i> Preview / Download</button>
@@ -1905,6 +1973,10 @@
         function renderTableTab6() {
             const sdEl = document.getElementById('report-start-date');
             const edEl = document.getElementById('report-end-date');
+            ['report-start-date','report-end-date','exp-tanggal'].forEach(function(id){
+                var elx = document.getElementById(id);
+                if (elx && !elx.dataset.yansDateBound) { elx.dataset.yansDateBound = '1'; elx.addEventListener('change', renderTableTab6); }
+            });
             const sd = sdEl ? sdEl.value : ''; 
             const ed = edEl ? edEl.value : '';
             let tGaji = 0, gHtml = '';
@@ -1915,7 +1987,7 @@
                     let h = Number(a.harga)||0;
                     a.variants.forEach(v => {
                         let q = Number(v.jumlah)||0; let sub = q*h; wGaji+=sub; tGaji+=sub;
-                        rows += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="p-3 text-slate-500">${a.tanggal}</td><td class="p-3 font-bold text-slate-800 truncate max-w-[100px]">${a.kode||'-'}</td><td class="p-3 font-semibold text-slate-700">${a.model}</td><td class="p-3 text-slate-600">${v.warna}(${v.ukuran||v.size||'-'})</td><td class="p-3 text-center font-black">${q}</td><td class="p-3 text-right font-bold text-emerald-600">${formatRp(sub)}</td></tr>`;
+                        rows += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="p-3 text-slate-500">${showDate(a.tanggal)}</td><td class="p-3 font-bold text-slate-800 truncate max-w-[100px]">${a.kode||'-'}</td><td class="p-3 font-semibold text-slate-700">${a.model}</td><td class="p-3 text-slate-600">${v.warna}(${v.ukuran||v.size||'-'})</td><td class="p-3 text-center font-black">${q}</td><td class="p-3 text-right font-bold text-emerald-600">${formatRp(sub)}</td></tr>`;
                     });
                 });
                 gHtml += `
@@ -1935,7 +2007,7 @@
                 else {
                     fExp.forEach(e => {
                         let n = Number(e.nominal)||0; tExpOther+=n;
-                        tBody.innerHTML += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition"><td class="p-3 text-slate-500">${e.tanggal}</td><td class="p-3"><span class="bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider">${e.kategori}</span></td><td class="p-3 font-semibold text-slate-700">${e.keterangan}</td><td class="p-3 text-right font-black text-rose-600">${formatRp(n)}</td><td class="p-3 text-center no-print"><button onclick="deleteExpenseItem(${e.id})" class="text-rose-500 hover:text-rose-700 font-bold transition"><i class="fa-solid fa-trash-can"></i></button></td></tr>`;
+                        tBody.innerHTML += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition"><td class="p-3 text-slate-500">${showDate(e.tanggal)}</td><td class="p-3"><span class="bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider">${e.kategori}</span></td><td class="p-3 font-semibold text-slate-700">${e.keterangan}</td><td class="p-3 text-right font-black text-rose-600">${formatRp(n)}</td><td class="p-3 text-center no-print"><button onclick="deleteExpenseItem(${e.id})" class="text-rose-500 hover:text-rose-700 font-bold transition"><i class="fa-solid fa-trash-can"></i></button></td></tr>`;
                     });
                 }
             }
@@ -2080,6 +2152,7 @@
                 currentPdfTitle = `Laporan_Pengeluaran_${new Date().toISOString().slice(0,10)}`;
                 let sd = document.getElementById('report-start-date').value; let ed = document.getElementById('report-end-date').value;
                 let htmlExp = document.getElementById('container-report-gaji-groups').innerHTML;
+                sd = showDate(sd); ed = showDate(ed);
                 let totGaji = document.getElementById('summary-total-gaji').innerText;
                 let totExp = document.getElementById('summary-total-exp').innerText;
                 let grand = document.getElementById('summary-grand-total').innerText;
@@ -2099,6 +2172,7 @@
             } else if(tabKey === 'tab7') {
                 currentPdfTitle = `Laporan_Profit_Loss_${new Date().toISOString().slice(0,10)}`;
                 let sd = document.getElementById('pl-start-date').value; let ed = document.getElementById('pl-end-date').value;
+                sd = showDate(sd); ed = showDate(ed);
                 let rev = document.getElementById('pl-total-rev').innerText;
                 let exp = document.getElementById('pl-total-exp').innerText;
                 let net = document.getElementById('pl-total-net').innerText;
@@ -2213,7 +2287,7 @@
                     </div>
                     <table style="width:100%;font-size:12px;margin-bottom:15px;">
                         <tr><td style="width:100px;color:#64748b;">Nama Pekerja</td><td>: <b>${tukang}</b></td></tr>
-                        <tr><td style="color:#64748b;">Periode</td><td>: ${sd} s/d ${ed}</td></tr>
+                        <tr><td style="color:#64748b;">Periode</td><td>: ${showDate(sd)} s/d ${showDate(ed)}</td></tr>
                     </table>
                     <table style="width:100%;border-collapse:collapse;font-size:11px;text-align:left;margin-bottom:20px;">
                         <thead><tr style="background:#f1f5f9;border-bottom:1px solid #cbd5e1;"><th style="padding:6px;">Tgl</th><th style="padding:6px;">Jenis</th><th style="padding:6px;">Model</th><th style="padding:6px;">Rincian</th><th style="padding:6px;text-align:center;">Qty</th><th style="padding:6px;text-align:right;">Upah/Pcs</th><th style="padding:6px;text-align:right;">Total</th></tr></thead>
@@ -2285,7 +2359,7 @@
             db.kasbon.forEach(item => {
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 border-b border-slate-100 transition">
-                        <td class="p-3 text-slate-500">${item.tanggal}</td>
+                        <td class="p-3 text-slate-500">${showDate(item.tanggal)}</td>
                         <td class="p-3 font-bold text-slate-800">${item.keterangan}</td>
                         <td class="p-3 text-right font-black text-rose-600">${formatRp(item.jumlah)}</td>
                         <td class="p-3 text-center">

@@ -170,6 +170,10 @@
       if (input) input.click();
     },
     addAccRow: function () { addAccRow(); },
+    // Pull server jobs into the local mirror. Used after sign-in/session
+    // restore so Ambil Jahit / Storan / Kiriman can resolve server job ids
+    // even when the Pekerjaan row was created in another browser.
+    pullJobs: function () { return pullJobs(); },
   };
 
   // ---------- Pull (server -> local mirror), used after sign-in and on demand ----------
@@ -242,6 +246,14 @@
         }
       });
       fresh.forEach(function (row) { db.tab1.push(row); });
+      // Refresh the local id -> server id map, including rows that already had
+      // a dbId from a previous session (map can be lost between browsers).
+      try {
+        (db.tab1 || []).forEach(function (row) {
+          if (row.dbId) map[String(row.dbId)] = row.id;
+        });
+        writeMap(map);
+      } catch (e) { /* best effort */ }
       if (typeof saveData === "function") saveData();
       if (typeof renderTableTab1 === "function") renderTableTab1();
       return { ok: true, count: items.length };
